@@ -38,6 +38,7 @@ html, body { height: 100%; overflow: hidden; }
 .ln.on .fill { background: linear-gradient(90deg, var(--gold) calc(var(--p, 0) * 100%), var(--text) calc(var(--p, 0) * 100%)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 24px rgba(0,0,0,.6)); }
 .syncing .ln { cursor: pointer; }
 .syncing .ln:hover { outline: 2px dashed rgba(255,255,255,.4); border-radius: 10px; }
+.kbd-nav .ln:focus { outline: 3px solid var(--gold); outline-offset: 6px; border-radius: 10px; box-shadow: none; opacity: 1; }
 .ln.next { outline: 3px dashed var(--pink); outline-offset: 6px; border-radius: 10px; opacity: 1; }
 .recording .ln { cursor: pointer; }
 #loading { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-size: 24px; color: var(--gold); }

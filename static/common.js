@@ -322,8 +322,9 @@ function setupSearch(form, input, results, opts = {}) {
   });
 }
 
-// Botão clicado perde o foco, para o espaço não "clicar" nele de novo
+// Botão clicado com o mouse perde o foco, para o espaço não "clicar" nele de novo.
+// Apertado pelo teclado ou pelo OK do controle remoto (detail 0), o foco fica onde está.
 document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest("button");
-  if (b) b.blur();
+  if (b && e.detail > 0) b.blur();
 });

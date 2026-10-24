@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/disco.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
 <div class="beams" aria-hidden="true"><span></span><span></span></div>
@@ -120,7 +120,7 @@
 
   <!-- Escolher letra -->
   <div id="view-lyrics" hidden style="display:flex;flex-direction:column;gap:20px">
-    <a class="back" data-back><i data-icon="back" data-size="18"></i>voltar</a>
+    <button type="button" class="back" data-back><i data-icon="back" data-size="18"></i>voltar</button>
     <h1 class="display" id="lyrics-song" style="margin:0;font-size:34px"></h1>
     <div class="card">
       <h2 class="h-section" style="margin-bottom:14px">ESCOLHE A LETRA</h2>
@@ -140,7 +140,7 @@
 
   <!-- Escolher capa -->
   <div id="view-cover" hidden style="display:flex;flex-direction:column;gap:20px">
-    <a class="back" data-back><i data-icon="back" data-size="18"></i>voltar</a>
+    <button type="button" class="back" data-back><i data-icon="back" data-size="18"></i>voltar</button>
     <h1 class="display" id="cover-song" style="margin:0;font-size:34px"></h1>
     <div class="card">
       <h2 class="h-section" style="margin-bottom:14px">ESCOLHE A CAPA</h2>
@@ -178,8 +178,9 @@
   </div>
 </dialog>
 
-<script src="/static/common.js?v=3"></script>
+<script src="/static/common.js?v=4"></script>
+<script src="/static/tvnav.js?v=1"></script>
 <script src="/static/fx.js?v=3"></script>
-<script src="/static/app.js?v=3"></script>
+<script src="/static/app.js?v=4"></script>
 </body>
 </html>

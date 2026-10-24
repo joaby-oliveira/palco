@@ -7,8 +7,8 @@
 <link rel="icon" href="/static/disco.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=3">
-<link rel="stylesheet" href="/static/player.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=4">
+<link rel="stylesheet" href="/static/player.css?v=4">
 </head>
 <body>
 <div id="stage">
@@ -32,7 +32,7 @@
     <span class="qr"><img src="/api/qr.svg" alt="QR code para pedir música"></span>
   </div>
 
-  <div id="lyrics-box">
+  <div id="lyrics-box" data-tv-noscroll>
     <div id="lyrics-scroll"><div id="lyrics-lines"></div></div>
     <div id="loading">Carregando as faixas…</div>
   </div>
@@ -90,7 +90,7 @@
       <span id="time-total">0:00</span>
     </div>
     <div class="bar-row">
-      <button id="play" class="icon-btn round play" title="Tocar / pausar (espaço)" aria-label="Tocar ou pausar"><i data-icon="play" data-size="22"></i></button>
+      <button id="play" data-tv-default class="icon-btn round play" title="Tocar / pausar (espaço)" aria-label="Tocar ou pausar"><i data-icon="play" data-size="22"></i></button>
       <button id="finish" class="icon-btn round" title="Encerrar e chamar o próximo" aria-label="Encerrar e chamar o próximo"><i data-icon="next" data-size="20"></i></button>
       <span class="sep"></span>
       <div class="seg voice" id="voice" role="group" aria-label="Voz original" data-separated>
@@ -127,8 +127,9 @@
     </div>
   </div>
 </div>
-<script src="/static/common.js?v=3"></script>
+<script src="/static/common.js?v=4"></script>
+<script src="/static/tvnav.js?v=1"></script>
 <script src="/static/fx.js?v=3"></script>
-<script src="/static/player.js?v=3"></script>
+<script src="/static/player.js?v=4"></script>
 </body>
 </html>

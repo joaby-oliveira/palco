@@ -109,8 +109,11 @@ function renderLyrics() {
     return;
   }
   $("lyrics-scroll").classList.toggle("free", !synced && !rec);
+  // No modo "escolher a linha certa", cada linha vira um botão para o controle remoto
+  const pick = syncMode && synced;
   lines.forEach((l, i) => {
-    box.append(h("div", { class: "ln" + (l.text ? "" : " empty"), "data-i": i, onclick: () => syncToLine(i) }, h("span", { class: "fill" }, l.text || "♪")));
+    box.append(h("div", { class: "ln" + (l.text ? "" : " empty"), "data-i": i, onclick: () => syncToLine(i),
+      tabindex: pick && l.t != null ? "0" : null, role: pick ? "button" : null }, h("span", { class: "fill" }, l.text || "♪")));
   });
 }
 
@@ -191,18 +194,25 @@ function syncToLine(i) {
   if (!syncMode || !synced || lines[i].t == null) return;
   // A linha clicada passa a começar agora
   setOffset(now() - btDelay - lines[i].t);
-  syncMode = false;
-  $("sync-mouse").classList.remove("on");
-  $("lyrics-box").classList.remove("syncing");
+  setSyncMode(false);
   toast("Letra sincronizada.");
+}
+
+function setSyncMode(on) {
+  const back = !on && $("lyrics-box").contains(document.activeElement);
+  syncMode = on;
+  $("sync-mouse").classList.toggle("on", on);
+  $("sync-mouse").setAttribute("aria-pressed", on);
+  $("lyrics-box").classList.toggle("syncing", on);
+  renderLyrics();
+  activeIdx = -2;
+  if (back) $("sync-mouse").focus();
 }
 
 $("sync-mouse").addEventListener("click", () => {
   if (!synced) { toast("Essa letra não tem tempos. Use Gravar sincronia.", true); return; }
-  syncMode = !syncMode;
-  $("sync-mouse").classList.toggle("on", syncMode);
-  $("lyrics-box").classList.toggle("syncing", syncMode);
-  if (syncMode) toast("Clique na linha da letra no momento em que ela começa.");
+  setSyncMode(!syncMode);
+  if (syncMode) toast("Escolha a linha da letra (clique, ou setas e OK) no momento em que ela começa.");
 });
 document.querySelectorAll("[data-shift]").forEach((b) => b.addEventListener("click", () => setOffset(offset + parseFloat(b.dataset.shift))));
 
@@ -221,7 +231,7 @@ let rec = null; // { idx, history, backup, backupOffset }
 
 function startRec() {
   if (!lines.length) { toast("Escolha ou cole uma letra primeiro (na ficha da música).", true); return; }
-  if (syncMode) $("sync-mouse").click();
+  if (syncMode) setSyncMode(false);
   rec = { idx: 0, history: [], backup: lines.map((l) => l.t), backupOffset: offset };
   // O ajuste atual passa para os tempos das linhas
   for (const l of lines) if (l.t != null) l.t = Math.round((l.t + offset) * 100) / 100;
@@ -235,6 +245,7 @@ function startRec() {
   $("lyrics-box").classList.add("recording");
   renderLyrics();
   activeIdx = -2;
+  $("rec-mark").focus();
   if (!playing) play();
 }
 
@@ -282,8 +293,10 @@ async function finishRec(save) {
     setOffset(rec.backupOffset, false);
   }
   rec = null;
+  const refocus = $("rec-bar").contains(document.activeElement);
   $("rec-bar").hidden = true;
   $("rec-start").hidden = false;
+  if (refocus) $("rec-start").focus();
   $("lyrics-box").classList.remove("recording");
   renderLyrics();
   activeIdx = -2;
@@ -320,8 +333,16 @@ for (const id of ["key-note", "key-scale"]) $(id).addEventListener("change", () 
 });
 
 // Gavetas "Letra fora do tempo?" e "Ajustes"
+const DRAWERS = { "sync-drawer": "open-sync", "adjust-drawer": "open-adjust" };
 function toggleDrawer(id) {
-  for (const d of ["sync-drawer", "adjust-drawer"]) $(d).hidden = d === id ? !$(d).hidden : true;
+  const was = Object.keys(DRAWERS).find((d) => !$(d).hidden);
+  for (const d of Object.keys(DRAWERS)) $(d).hidden = d === id ? !$(d).hidden : true;
+  const open = Object.keys(DRAWERS).find((d) => !$(d).hidden);
+  // Pelo controle remoto, o foco entra na gaveta aberta e volta para o botão dela ao fechar
+  if (document.documentElement.classList.contains("kbd-nav")) {
+    if (open) TvNav.focusFirst($(open).querySelector(".sync, .adjust-grid"));
+    else if (was && ($(was).contains(document.activeElement) || document.activeElement === document.body)) $(DRAWERS[was]).focus();
+  }
   wake();
 }
 $("open-sync").addEventListener("click", () => toggleDrawer("sync-drawer"));
@@ -335,7 +356,11 @@ function wake() {
   stage.classList.remove("idle");
   clearTimeout(idleTimer);
   const drawerOpen = !$("sync-drawer").hidden || !$("adjust-drawer").hidden;
-  if (playing && !drawerOpen && !rec && !$("controls").matches(":hover")) idleTimer = setTimeout(() => stage.classList.add("idle"), 3000);
+  if (playing && !drawerOpen && !rec && !$("controls").matches(":hover")) idleTimer = setTimeout(goIdle, 3000);
+}
+function goIdle() {
+  stage.classList.add("idle");
+  if ($("controls").contains(document.activeElement)) document.activeElement.blur();
 }
 $("fullscreen").addEventListener("click", toggleFullscreen);
 function toggleFullscreen() {
@@ -362,24 +387,51 @@ document.querySelector("[data-dlg-close]").addEventListener("click", () => $("so
 
 setupFxKeys(() => STATE && STATE.fx.favorites);
 
+// Controle remoto: com os controles escondidos, ← → avançam e voltam 5 s e as
+// outras setas ou o OK mostram os controles. Com eles na tela, as setas andam
+// entre os botões (tvnav.js) e, na barra de posição, ← → também pulam 5 s.
+const MEDIA = {
+  MediaPlayPause: () => (playing ? pause() : play()), MediaPlay: () => play(), MediaPause: () => pause(),
+  MediaFastForward: () => seek(now() + 10), MediaRewind: () => seek(now() - 10),
+  MediaTrackNext: () => $("finish").click(), MediaStop: () => $("finish").click(),
+};
+const onButton = (t) => t.matches && t.matches("button, a[href], input, select, [role=button]");
+
 document.addEventListener("keydown", (e) => {
   if (e.target.matches && e.target.matches("input[type=number], input[type=text], select")) return;
+  const wasIdle = stage.classList.contains("idle");
+  wake();
   if (!$("final").hidden) {
-    if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); $("final-next").click(); }
+    if (e.code === "Space" || (e.key === "Enter" && !onButton(e.target))) { e.preventDefault(); $("final-next").click(); }
     return;
   }
+  if (MEDIA[e.key]) { e.preventDefault(); MEDIA[e.key](); return; }
   if (rec) {
-    if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); markLine(); return; }
+    // O OK marca a linha, a não ser que o foco esteja em outro botão (Desfazer, Concluir…)
+    if (e.code === "Space" || (e.key === "Enter" && (!onButton(e.target) || e.target === $("rec-mark")))) { e.preventDefault(); markLine(); return; }
     if (e.code === "Backspace") { e.preventDefault(); undoMark(); return; }
     if (e.code === "Escape" && !document.fullscreenElement) { finishRec(true); return; }
   }
   if ($("sounds-dlg").open) return;
   if (e.key === "s" || e.key === "S") { $("sounds-dlg").showModal(); return; }
+  const inUi = !wasIdle && e.target !== document.body;
+  const arrow = e.key === "ArrowRight" ? 5 : e.key === "ArrowLeft" ? -5 : 0;
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   else if (e.key === "f" || e.key === "F") toggleFullscreen();
-  else if (e.key === "ArrowRight") seek(now() + 5);
-  else if (e.key === "ArrowLeft") seek(now() - 5);
+  else if (arrow && (!inUi || e.target === $("seek"))) { e.preventDefault(); seek(now() + arrow); }
+  else if (wasIdle && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Enter") && !onButton(e.target)) {
+    e.preventDefault();
+    TvNav.focus($("play"));
+  }
 });
+
+// Voltar do controle remoto: fecha a gaveta aberta; sem gaveta, o navegador volta para o telão
+TvNav.onBack = () => {
+  if (rec) return false;
+  if (syncMode) { setSyncMode(false); return true; }
+  if (Object.keys(DRAWERS).some((d) => !$(d).hidden)) { toggleDrawer(null); return true; }
+  return false;
+};
 
 // ---------- Festa: quem canta, quem vem, votos ----------
 
@@ -474,6 +526,7 @@ async function showFinal() {
   if (document.fullscreenElement) { /* fica em tela cheia: a próxima música abre na mesma aba */ }
   $("final").hidden = false;
   stage.classList.remove("idle");
+  $("final-next").focus();
   confetti();
   // Aplausos no fim (de quem tiver na pasta), num canal só do palco
   const claps = ["claps-with-cheers-audience", "applause_2"].find((id) => STATE && STATE.fx.sounds.some((s) => s.id === id));

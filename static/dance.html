@@ -7,8 +7,8 @@
 <link rel="icon" href="/static/disco.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=3">
-<link rel="stylesheet" href="/static/player.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=4">
+<link rel="stylesheet" href="/static/player.css?v=4">
 <link rel="stylesheet" href="/static/dance.css?v=2">
 </head>
 <body>
@@ -53,7 +53,7 @@
       </ol>
       <div class="ready-status" id="ready-status">Carregando o detector de movimentos…</div>
       <div class="ready-actions">
-        <button class="btn big" id="start" disabled><i data-icon="dance" data-size="24"></i>COMEÇAR</button>
+        <button class="btn big" id="start" disabled data-tv-default><i data-icon="dance" data-size="24"></i>COMEÇAR</button>
         <button class="btn ghost" id="start-free" hidden>Dançar sem nota</button>
       </div>
       <div class="phone-cam">
@@ -85,7 +85,7 @@
       <span id="time-total">0:00</span>
     </div>
     <div class="bar-row">
-      <button id="play" class="icon-btn round play" title="Tocar / pausar (espaço)" aria-label="Tocar ou pausar"><i data-icon="play" data-size="22"></i></button>
+      <button id="play" data-tv-default class="icon-btn round play" title="Tocar / pausar (espaço)" aria-label="Tocar ou pausar"><i data-icon="play" data-size="22"></i></button>
       <button id="finish" class="icon-btn round" title="Encerrar e chamar o próximo" aria-label="Encerrar e chamar o próximo"><i data-icon="next" data-size="20"></i></button>
       <span class="sep"></span>
       <span class="pill" id="mode-info"></span>
@@ -113,8 +113,9 @@
     </div>
   </div>
 </div>
-<script src="/static/common.js?v=3"></script>
+<script src="/static/common.js?v=4"></script>
+<script src="/static/tvnav.js?v=1"></script>
 <script src="/static/fx.js?v=3"></script>
-<script type="module" src="/static/dance.js?v=5"></script>
+<script type="module" src="/static/dance.js?v=6"></script>
 </body>
 </html>

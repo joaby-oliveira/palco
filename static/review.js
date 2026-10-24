@@ -446,8 +446,10 @@ $("prev-miss").addEventListener("click", () => jumpMiss(-1));
 document.addEventListener("keydown", (e) => {
   if (e.target.matches && e.target.matches("input, select, textarea")) return;
   if (e.code === "Space") { e.preventDefault(); $("play").click(); }
-  else if (e.key === "ArrowRight") video.currentTime += 1 / pose.fps;
-  else if (e.key === "ArrowLeft") video.currentTime -= 1 / pose.fps;
+  // Com um botão focado, as setas andam entre os botões (controle remoto, tvnav.js)
+  else if (e.target !== document.body && e.key.startsWith("Arrow")) return;
+  else if (e.key === "ArrowRight") { e.preventDefault(); video.currentTime += 1 / pose.fps; }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); video.currentTime -= 1 / pose.fps; }
 });
 
 function loop() {

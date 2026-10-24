@@ -91,6 +91,7 @@ function setSource() {
   $("cam-msg").textContent = "Sem câmera";
   $("cam-src").textContent = source === "phone" ? "Celular" : "Notebook";
   $("start").disabled = !source;
+  if (source && !started && (document.activeElement === document.body || document.activeElement === $("play"))) $("start").focus();
   if (source === "phone") toast("Câmera do celular conectada!");
   else if (before === "phone") toast(source ? "O celular parou de mandar. Voltei para a câmera do notebook." : "O celular parou de mandar os movimentos.", !source);
   if (!source) {
@@ -336,7 +337,15 @@ function setCamSize(size) {
 }
 $("cam-size").addEventListener("change", () => setCamSize($("cam-size").value));
 
-function toggleDrawer() { $("adjust-drawer").hidden = !$("adjust-drawer").hidden; wake(); }
+function toggleDrawer() {
+  $("adjust-drawer").hidden = !$("adjust-drawer").hidden;
+  // Pelo controle remoto, o foco entra na gaveta e volta para o botão de Ajustes ao fechar
+  if (document.documentElement.classList.contains("kbd-nav")) {
+    if (!$("adjust-drawer").hidden) TvNav.focusFirst($("adjust-drawer").querySelector(".adjust-grid"));
+    else if ($("adjust-drawer").contains(document.activeElement) || document.activeElement === document.body) $("open-adjust").focus();
+  }
+  wake();
+}
 $("open-adjust").addEventListener("click", toggleDrawer);
 document.querySelector("[data-drawer-close]").addEventListener("click", toggleDrawer);
 
@@ -346,7 +355,12 @@ let idleTimer = null;
 function wake() {
   stage.classList.remove("idle");
   clearTimeout(idleTimer);
-  if (playing() && $("adjust-drawer").hidden && !$("controls").matches(":hover")) idleTimer = setTimeout(() => stage.classList.add("idle"), 3000);
+  if (playing() && $("adjust-drawer").hidden && !$("controls").matches(":hover")) idleTimer = setTimeout(goIdle, 3000);
+}
+// Controles escondidos: o foco sai deles, para as setas voltarem a avançar/voltar o vídeo
+function goIdle() {
+  stage.classList.add("idle");
+  if ($("controls").contains(document.activeElement)) document.activeElement.blur();
 }
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
@@ -357,21 +371,46 @@ document.addEventListener("fullscreenchange", wake);
 document.addEventListener("mousemove", wake);
 $("controls").addEventListener("mouseleave", wake);
 
+// Controle remoto: igual ao palco do karaokê. Controles escondidos: ← → pulam 5 s,
+// as outras setas ou o OK mostram os controles. Com eles na tela, as setas andam entre os botões.
+const togglePlay = () => {
+  if (!started) { if (!$("start").disabled) begin(true); else if (!$("start-free").hidden) begin(false); }
+  else playing() ? pause() : play();
+};
+const MEDIA = {
+  MediaPlayPause: togglePlay, MediaPlay: () => (playing() ? null : togglePlay()), MediaPause: pause,
+  MediaFastForward: () => started && seek(clip.currentTime + 10), MediaRewind: () => started && seek(clip.currentTime - 10),
+  MediaTrackNext: () => $("finish").click(), MediaStop: () => $("finish").click(),
+};
+const onButton = (t) => t.matches && t.matches("button, a[href], input, select, [role=button]");
+
 document.addEventListener("keydown", (e) => {
   if (e.target.matches && e.target.matches("input[type=number], input[type=text], select")) return;
+  const wasIdle = stage.classList.contains("idle");
+  wake();
   if (!$("final").hidden) {
-    if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); $("final-next").click(); }
+    if (e.code === "Space" || (e.key === "Enter" && !onButton(e.target))) { e.preventDefault(); $("final-next").click(); }
     return;
   }
-  if (e.code === "Space") {
-    e.preventDefault();
-    if (!started) { if (!$("start").disabled) begin(true); else if (!$("start-free").hidden) begin(false); }
-    else playing() ? pause() : play();
-  } else if (e.key === "f" || e.key === "F") toggleFullscreen();
+  if (MEDIA[e.key]) { e.preventDefault(); MEDIA[e.key](); return; }
+  const inUi = !wasIdle && e.target !== document.body;
+  const arrow = e.key === "ArrowRight" ? 5 : e.key === "ArrowLeft" ? -5 : 0;
+  if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+  else if (e.key === "f" || e.key === "F") toggleFullscreen();
   else if (e.key === "c" || e.key === "C") setCamSize(CAM_SIZES[(CAM_SIZES.indexOf($("cam-size").value) + 1) % CAM_SIZES.length]);
-  else if (started && e.key === "ArrowRight") seek(clip.currentTime + 5);
-  else if (started && e.key === "ArrowLeft") seek(clip.currentTime - 5);
+  else if (started && arrow && (!inUi || e.target === $("seek"))) { e.preventDefault(); seek(clip.currentTime + arrow); }
+  else if (wasIdle && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Enter") && !onButton(e.target)) {
+    e.preventDefault();
+    TvNav.focus($("play"));
+  }
 });
+
+// Voltar do controle remoto: fecha os ajustes; sem eles, o navegador volta para o telão
+TvNav.onBack = () => {
+  if ($("adjust-drawer").hidden) return false;
+  toggleDrawer();
+  return true;
+};
 
 // ---------- Festa: quem dança, quem vem, efeitos ----------
 
@@ -497,6 +536,7 @@ async function showFinal(end) {
   if (ENTRY_ID) await api(`/api/stage/${ENTRY_ID}/finish`, { method: "POST" }).catch(() => {});
   $("final").hidden = false;
   stage.classList.remove("idle");
+  $("final-next").focus();
   confetti();
   const claps = ["claps-with-cheers-audience", "applause_2"].find((id) => STATE && STATE.fx.sounds.some((s) => s.id === id));
   if (claps) Fx.play(claps, "palco");
@@ -595,6 +635,7 @@ async function init() {
     status.className = "ready-status err";
     $("cam-msg").textContent = "Sem câmera";
     $("start-free").hidden = false;
+    if (document.activeElement === document.body) $("start-free").focus();
   }
 }
 

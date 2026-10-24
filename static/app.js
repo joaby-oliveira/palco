@@ -7,12 +7,26 @@ fillIcons();
 
 // ---------- Navegação entre telas ----------
 
+let backTo = null; // música cuja ficha abriu a tela de letra/capa: o foco volta para ela
+
 function show(view) {
   for (const v of ["home", "lyrics", "cover"]) $(`view-${v}`).hidden = v !== view;
   window.scrollTo(0, 0);
+  if (!document.documentElement.classList.contains("kbd-nav") || $(`view-${view}`).contains(document.activeElement)) return;
+  const card = view === "home" && backTo && document.querySelector(`.song-card[data-id="${backTo}"]`);
+  TvNav.focus(card || $(`view-${view}`).querySelector("[data-back]") || null);
 }
 document.querySelectorAll("[data-back]").forEach((a) => a.addEventListener("click", () => show("home")));
 document.querySelectorAll("dialog [data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
+
+// Controle remoto da TV: o telão rola, então o item focado fica no meio da tela.
+// Voltar sai da tela de letra/capa e fecha os resultados da busca.
+TvNav.scroll = "center";
+TvNav.onBack = () => {
+  if ($("view-home").hidden) { show("home"); return true; }
+  if (!$("results-panel").hidden) { $("close-results").click(); TvNav.focus($("search-input")); return true; }
+  return false;
+};
 
 // ---------- Uso do serviço (limite diário do MVSEP grátis) ----------
 
@@ -152,7 +166,7 @@ function renderHero() {
         s.kind === "karaoke" ? h("span", { class: "pill" }, "Versão karaokê") : null,
         s.kind === "dance" ? h("span", { class: "pill" }, "Dança") : null),
       h("div", { class: "hero-actions" },
-        h("button", { class: "btn big", onclick: () => startEntry(next) }, icon(s.kind === "dance" ? "dance" : "play", 22), s.kind === "dance" ? "BORA DANÇAR" : "SOLTAR O SOM"),
+        h("button", { class: "btn big", "data-tv-default": true, onclick: () => startEntry(next) }, icon(s.kind === "dance" ? "dance" : "play", 22), s.kind === "dance" ? "BORA DANÇAR" : "SOLTAR O SOM"),
         h("button", { class: "btn ghost", onclick: () => api(`/api/stage/${next.id}/later`, { method: "POST" }).catch((e) => toast(e.message, true)) }, "Pular a vez"),
         h("button", { class: "btn ghost", onclick: () => removeEntry(next) }, "Tirar da fila")))));
 }
@@ -230,7 +244,7 @@ function renderLibrary() {
   }
   for (const s of songs) {
     const st = songStatus(s);
-    box.append(h("button", { class: "song-card", onclick: () => openSong(s), "aria-label": `${s.title}, ${s.artist}. ${st.label}` },
+    box.append(h("button", { class: "song-card", "data-id": s.id, onclick: () => openSong(s), "aria-label": `${s.title}, ${s.artist}. ${st.label}` },
       h("span", { class: "art" }, h("img", { src: s.cover, alt: "", loading: "lazy" }), h("span", { class: "play" }, icon(s.kind === "dance" ? "dance" : "play", 20))),
       h("span", { class: "t" }, s.title),
       h("span", { class: "a" }, s.artist),
@@ -318,6 +332,7 @@ let lyricsSong = null;
 
 async function openLyrics(song, q = "") {
   lyricsSong = song;
+  backTo = song.id;
   $("lyrics-song").textContent = song.title;
   show("lyrics");
   const list = $("lyrics-list");
@@ -361,6 +376,7 @@ let coverSong = null;
 
 async function openCover(song, q = "") {
   coverSong = song;
+  backTo = song.id;
   $("cover-song").textContent = song.title;
   show("cover");
   const list = $("cover-list");
@@ -370,12 +386,12 @@ async function openCover(song, q = "") {
   catch (e) { list.replaceChildren(h("p", { class: "empty" }, e.message)); return; }
   list.replaceChildren();
   for (const url of urls) {
-    list.append(h("img", { src: url, alt: "", loading: "lazy", class: url === song.cover ? "sel" : "", onclick: async () => {
+    list.append(h("button", { type: "button", class: url === song.cover ? "sel" : "", "aria-label": url === song.cover ? "Capa atual" : "Usar esta capa", onclick: async () => {
       try {
         await api(`/api/songs/${song.id}/cover`, { method: "POST", body: { url } });
         show("home");
       } catch (e) { toast(e.message, true); }
-    } }));
+    } }, h("img", { src: url, alt: "", loading: "lazy" })));
   }
 }
 $("cover-form").addEventListener("submit", (e) => { e.preventDefault(); if (coverSong) openCover(coverSong, $("cover-q").value.trim()); });

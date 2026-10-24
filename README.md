@@ -102,6 +102,27 @@ Para adicionar outro serviço, crie um arquivo em `app/providers/` seguindo o
 - Espaço toca/pausa, setas pulam 5 s, F é tela cheia. Os controles somem
   sozinhos enquanto a música toca.
 
+## Na TV, pelo controle remoto
+
+Abra o endereço do Palco no navegador da TV e use só as setas, o OK e o Voltar.
+
+- **Setas** levam o contorno dourado para o botão mais próximo naquela
+  direção; **OK** aperta. Funciona no telão, nas fichas, nos ajustes e na mesa
+  de sons.
+- **Voltar** fecha o que estiver aberto (ficha, ajustes, gaveta do palco,
+  resultados da busca, tela de letra/capa).
+- Nos controles deslizantes, ← → mexem em passos de ~5%; nas listas de opções,
+  ← → trocam a opção.
+- **No palco**: com os controles escondidos, ← → pulam 5 s e ↑ ↓ ou OK mostram
+  os controles (com o foco no play). Botões de mídia do controle (play/pausa,
+  avançar, voltar) também funcionam.
+- **Gravar sincronia** pelo controle: o foco fica em **Marcar linha**, então
+  cada OK marca uma linha. Para desfazer ou concluir, ande até o botão e aperte
+  OK. Em **Clicar na linha certa**, ↑ leva às linhas da letra na tela e o OK
+  escolhe a que está tocando.
+- No fim da música o foco já fica no botão do próximo cantor; ← vai para o
+  **Bis!**.
+
 ## Modo dança
 
 Um "Just Dance" caseiro: o vídeo da coreografia toca na tela e a webcam do
