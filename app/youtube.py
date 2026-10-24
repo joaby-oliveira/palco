@@ -14,7 +14,7 @@ COOKIES = config.DATA_DIR / "youtube-cookies.txt"
 
 
 def _base() -> dict:
-    return {**_base(), "cookiefile": str(COOKIES)} if COOKIES.exists() else dict(_QUIET)
+    return {**_QUIET, "cookiefile": str(COOKIES)} if COOKIES.exists() else dict(_QUIET)
 
 
 def _video_id(text: str) -> str | None:
