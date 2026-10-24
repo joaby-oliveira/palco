@@ -20,4 +20,4 @@ ENV PORT=8000 HTTPS_PORT=0 PYTHONUNBUFFERED=1
 EXPOSE 8000
 VOLUME /app/data
 # O YouTube muda direto e versões velhas do yt-dlp param de baixar: atualiza a cada início
-CMD ["sh", "-c", "uv pip install --system -q -U --no-cache "yt-dlp[default]"; exec python -m app"]
+CMD ["sh", "-c", "uv pip install --system -q -U --no-cache 'yt-dlp[default]'; exec python -m app"]
