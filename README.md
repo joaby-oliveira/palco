@@ -169,3 +169,21 @@ mostra:
   do telão (`fx.js`). `app/dance.py` prepara o gabarito da dança.
 - `data/`: biblioteca, faixas separadas, convidados e configurações (não vai
   para o git).
+
+## No servidor (Docker)
+
+O `Dockerfile` roda o Palco atrás de um proxy que cuida do HTTPS (Traefik,
+Caddy, nginx). Os dados ficam no volume `/app/data`.
+
+```
+docker build -t palco .
+docker run -d -v palco-data:/app/data -p 8000:8000 \
+  -e PUBLIC_URL=https://palco.seudominio.com -e HOST_KEY=uma-chave-longa palco
+```
+
+- `PUBLIC_URL`: endereço que vai nos QR codes (celular e câmera do modo dança).
+- `HOST_KEY`: no servidor ninguém chega pelo localhost, então o telão vira
+  anfitrião abrindo `https://palco.seudominio.com/?host=uma-chave-longa` uma
+  vez (fica num cookie por um ano). Sem a chave, o navegador é convidado.
+- `HTTPS_PORT=0` (já é o padrão da imagem): sem a porta 8443 com certificado
+  próprio, porque o domínio já tem HTTPS.

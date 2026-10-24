@@ -9,8 +9,13 @@ if __name__ == "__main__":
     from .main import app, lan_ip
 
     port, https_port = config.get("port"), config.get("https_port")
-    cert, key = tls.ensure(lan_ip())
     print(f"\n  Karaokê rodando em  http://localhost:{port}")
+    if not https_port:
+        # HTTPS_PORT=0: no servidor o proxy já cuida do HTTPS. Sem proxy_headers de propósito:
+        # um X-Forwarded-For: 127.0.0.1 forjado viraria anfitrião.
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning", proxy_headers=False)
+        raise SystemExit
+    cert, key = tls.ensure(lan_ip())
     print(f"  Câmera do celular (modo dança) em  https://{lan_ip()}:{https_port}/cam\n")
     # O mesmo app nas duas portas (um processo só: fila, festa e câmera compartilhadas).
     # Só o primeiro roda a inicialização, senão a fila de preparo começaria duas vezes.

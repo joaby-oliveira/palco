@@ -1,7 +1,9 @@
 """Servidor do karaokê. Rode com:  .venv\\Scripts\\python -m app"""
 import asyncio
+import hmac
 import io
 import json
+import os
 import socket
 from pathlib import Path
 
@@ -10,7 +12,7 @@ import qrcode
 import qrcode.image.svg
 from fastapi import Body, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import camlink, config, dance, metadata, party, providers, store, usage, worker, youtube
@@ -19,6 +21,12 @@ STATIC = config.ROOT / "static"
 STEMS = {"original", "instrumental", "lead", "backing"}
 
 app = FastAPI(title="Karaoke")
+
+# No servidor (atrás de um proxy com HTTPS) o endereço dos QR codes é o domínio,
+# e quem é o anfitrião é decidido pela chave, já que ninguém chega pelo localhost.
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
+HOST_KEY = os.environ.get("HOST_KEY", "")
+HOST_COOKIE = "palco_host"
 
 
 def code_version() -> float:
@@ -61,16 +69,23 @@ def lan_ip() -> str:
 
 
 def session_url() -> str:
+    if PUBLIC_URL:
+        return f"{PUBLIC_URL}/m"
     return f"http://{lan_ip()}:{config.get('port')}/m"
 
 
 def cam_url() -> str:
     """Página da câmera do celular (modo dança). Precisa ser HTTPS para o celular liberar a câmera."""
+    if PUBLIC_URL:
+        return f"{PUBLIC_URL}/cam"
     return f"https://{lan_ip()}:{config.get('https_port')}/cam"
 
 
 def is_host(request) -> bool:
-    return request.client.host in ("127.0.0.1", "::1", "localhost")
+    if request.client.host in ("127.0.0.1", "::1", "localhost"):
+        return True
+    cookie = request.cookies.get(HOST_COOKIE, "")
+    return bool(HOST_KEY) and hmac.compare_digest(cookie.encode(), HOST_KEY.encode())
 
 
 def client_id(request) -> str:
@@ -101,7 +116,12 @@ def _song_or_404(song_id: str) -> dict:
 # ---------- Páginas ----------
 
 @app.get("/")
-def index():
+def index(host: str = ""):
+    # /?host=CHAVE vira este navegador no notebook do anfitrião (fica num cookie)
+    if host and HOST_KEY and hmac.compare_digest(host.encode(), HOST_KEY.encode()):
+        response = RedirectResponse("/", status_code=303)
+        response.set_cookie(HOST_COOKIE, HOST_KEY, max_age=60 * 60 * 24 * 365, httponly=True, secure=True, samesite="lax")
+        return response
     return FileResponse(STATIC / "index.html")
 
 
@@ -137,7 +157,7 @@ def get_state(request: Request):
 @app.websocket("/ws")
 async def ws(socket_: WebSocket):
     await socket_.accept()
-    host = socket_.client.host in ("127.0.0.1", "::1")
+    host = is_host(socket_)
     client = socket_.query_params.get("client") or "anon"
     # Quem conta como "na festa" são os celulares; o notebook não entra na conta
     if not host:
