@@ -3,6 +3,8 @@
 # Tudo entre chaves: o shell lê o script inteiro antes de rodar, porque o git pull pode trocar este arquivo.
 {
 cd /opt/palco
+# Se o Easypanel apagar a rota do Palco, ela volta aqui
+[ -f /etc/easypanel/traefik/config/palco.yaml ] || sh deploy/traefik.sh
 git fetch -q origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] && exit 0
 

@@ -49,10 +49,11 @@ async def no_cache_pages(request: Request, call_next):
     return response
 
 
-# Deploy sem queda no servidor: o container novo sobe em espera (PALCO_STANDBY=1), sem
-# carregar o estado nem rodar a fila de preparo, enquanto o antigo ainda atende. Quando
-# o antigo para, o deploy chama /api/activate e só aí o novo lê data/ e entra no ar.
-STANDBY = os.environ.get("PALCO_STANDBY") == "1"
+# Deploy sem queda no servidor: o container novo sobe em espera, sem carregar o estado
+# nem rodar a fila de preparo, enquanto o antigo ainda atende. Quando o antigo sai, o
+# deploy chama /api/activate e só aí o novo lê data/ e entra no ar. A espera é um arquivo
+# (e não uma variável) para que, se o servidor reiniciar, o container volte já ativo.
+_standby_flag = config.DATA_DIR / f"standby-{os.environ['PALCO_NAME']}" if os.environ.get("PALCO_NAME") else None
 _active = False
 
 
@@ -70,12 +71,14 @@ def _activate():
     party.load()
     worker.start()
     _active = True
+    if _standby_flag:
+        _standby_flag.unlink(missing_ok=True)
 
 
 @app.on_event("startup")
 def _startup():
     config.load()
-    if not STANDBY:
+    if not (_standby_flag and _standby_flag.exists()):
         _activate()
 
 

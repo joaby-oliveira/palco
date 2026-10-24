@@ -199,11 +199,13 @@ cada minuto. Se tem commit novo, roda `deploy/deploy.sh`, que troca o container
 sem derrubar o site (blue-green):
 
 1. faz o build da imagem nova com o container atual ainda no ar;
-2. sobe o novo em espera (`PALCO_STANDBY=1`): ele não lê `data/` nem prepara
-   músicas, para não brigar com o atual;
-3. para o atual e ativa o novo, que aí lê a fila, os votos e as músicas do
-   disco. A conexão ao vivo do telão e dos celulares pisca uns 2 ou 3 segundos
-   e volta sozinha; a fila do palco fica salva em `data/party.json`;
+2. sobe o novo em espera (arquivo `data/standby-<nome>`), fora da rede do
+   Traefik: ele não lê `data/` nem prepara músicas, para não brigar com o atual;
+3. tira o atual da rede, ativa o novo (que aí lê a fila, os votos e as músicas
+   do disco) e passa para ele o alias `palco-live`, para onde aponta a rota
+   fixa do Traefik (`deploy/traefik.sh`). O retry do Traefik segura os
+   requests desse meio segundo; só a conexão ao vivo do telão e dos celulares
+   cai e volta sozinha em 1,5 s. A fila do palco fica salva em `data/party.json`;
 4. se o novo não subir, o antigo continua (ou volta) no ar.
 
 Com uma música no meio do preparo, o deploy espera ela terminar (até 20
