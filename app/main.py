@@ -49,12 +49,51 @@ async def no_cache_pages(request: Request, call_next):
     return response
 
 
-@app.on_event("startup")
-def _startup():
+# Deploy sem queda no servidor: o container novo sobe em espera (PALCO_STANDBY=1), sem
+# carregar o estado nem rodar a fila de preparo, enquanto o antigo ainda atende. Quando
+# o antigo para, o deploy chama /api/activate e só aí o novo lê data/ e entra no ar.
+STANDBY = os.environ.get("PALCO_STANDBY") == "1"
+_active = False
+
+
+@app.middleware("http")
+async def standby_gate(request: Request, call_next):
+    if not _active and request.url.path not in ("/api/health", "/api/activate"):
+        return Response("Subindo uma versão nova, um instante...", status_code=503, headers={"Retry-After": "2"})
+    return await call_next(request)
+
+
+def _activate():
+    global _active
     config.load()
     store.load()
     party.load()
     worker.start()
+    _active = True
+
+
+@app.on_event("startup")
+def _startup():
+    config.load()
+    if not STANDBY:
+        _activate()
+
+
+@app.get("/api/health")
+def health():
+    if not _active:
+        raise HTTPException(503, "Em espera")
+    return {"ok": True}
+
+
+@app.post("/api/activate")
+def activate(request: Request):
+    # Só o próprio container (docker exec) ativa
+    if request.client.host not in ("127.0.0.1", "::1"):
+        raise HTTPException(403)
+    if not _active:
+        _activate()
+    return {"ok": True}
 
 
 def lan_ip() -> str:

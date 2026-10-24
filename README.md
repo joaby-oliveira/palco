@@ -192,10 +192,20 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
   "Get cookies.txt LOCALLY" (de preferência numa conta secundária) e salve
   como `data/youtube-cookies.txt`. Vale na hora, sem reiniciar.
 
-### Deploy automático
+### Deploy automático e sem queda
 
 No servidor, o `palco-autodeploy.timer` (systemd) confere o `main` do GitHub a
-cada minuto. Se tem commit novo, roda `/opt/palco-deploy.sh` (git pull, build
-da imagem e container novo) e confere se o site respondeu. Ou seja: `git push`
-e em até uns 3 minutos está no ar. Para acompanhar:
+cada minuto. Se tem commit novo, roda `deploy/deploy.sh`, que troca o container
+sem derrubar o site (blue-green):
+
+1. faz o build da imagem nova com o container atual ainda no ar;
+2. sobe o novo em espera (`PALCO_STANDBY=1`): ele não lê `data/` nem prepara
+   músicas, para não brigar com o atual;
+3. para o atual e ativa o novo, que aí lê a fila, os votos e as músicas do
+   disco. A conexão ao vivo do telão e dos celulares pisca uns 2 ou 3 segundos
+   e volta sozinha; a fila do palco fica salva em `data/party.json`;
+4. se o novo não subir, o antigo continua (ou volta) no ar.
+
+Com uma música no meio do preparo, o deploy espera ela terminar (até 20
+minutos), para não perder a separação. Para acompanhar:
 `journalctl -u palco-autodeploy -f`.

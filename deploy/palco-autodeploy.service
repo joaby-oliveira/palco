@@ -1,0 +1,7 @@
+[Unit]
+Description=Deploy automático do Palco (GitHub main)
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -n /run/palco-deploy.lock /bin/sh /opt/palco/deploy/autodeploy.sh

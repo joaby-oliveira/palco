@@ -35,14 +35,29 @@ def _file():
     return config.DATA_DIR / "guests.json"
 
 
+def _stage_file():
+    return config.DATA_DIR / "party.json"
+
+
 def load():
-    global _guests
+    global _guests, _current, _last
     if _file().exists():
         _guests = json.loads(_file().read_text(encoding="utf-8"))
+    # A fila do palco sobrevive a um reinício (deploy no servidor, notebook reiniciado)
+    if _stage_file().exists():
+        stage = json.loads(_stage_file().read_text(encoding="utf-8"))
+        _queue[:] = stage.get("queue", [])
+        _current, _last = stage.get("current"), stage.get("last")
 
 
 def _save_guests():
     _file().write_text(json.dumps(_guests, indent=1, ensure_ascii=False), encoding="utf-8")
+
+
+def _save_stage():
+    tmp = _stage_file().with_suffix(".tmp")
+    tmp.write_text(json.dumps({"queue": _queue, "current": _current, "last": _last}, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(_stage_file())
 
 
 # ---------- Convidados ----------
@@ -93,6 +108,7 @@ def enqueue(song_id: str, client: str, host: bool) -> dict:
                 return e
         e = _entry(song_id, client, host)
         _queue.append(e)
+        _save_stage()
     store.touch()
     return e
 
@@ -107,6 +123,7 @@ def remove(entry_id: str, client: str, host: bool) -> bool:
                 break
         else:
             return False
+        _save_stage()
     store.touch()
     return True
 
@@ -115,6 +132,7 @@ def drop_song(song_id: str):
     """Música apagada da biblioteca sai da fila."""
     with _lock:
         _queue[:] = [e for e in _queue if e["song_id"] != song_id]
+        _save_stage()
     store.touch()
 
 
@@ -125,6 +143,7 @@ def to_end(entry_id: str):
                 _queue.remove(e)
                 _queue.append(e)
                 break
+        _save_stage()
     store.touch()
 
 
@@ -141,6 +160,7 @@ def start(entry_id: str | None = None, song_id: str | None = None, client: str =
             raise KeyError("Esse pedido não está mais na fila.")
         e = dict(e, started=time.time(), votes={})
         _current = e
+        _save_stage()
     store.touch()
     return e
 
@@ -151,6 +171,7 @@ def finish(entry_id: str):
         if _current and _current["id"] == entry_id:
             _last = dict(_current, finished=time.time())
             _current = None
+        _save_stage()
     store.touch()
 
 
@@ -164,6 +185,7 @@ def vote(client: str, score: int):
         if target["client"] == client:
             raise PermissionError("Votar em si mesmo não vale!")
         target["votes"][client] = max(0, min(100, int(score)))
+        _save_stage()
     store.touch()
 
 
