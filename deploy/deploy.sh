@@ -2,9 +2,9 @@
 # Deploy sem queda (blue-green) do Palco no servidor:
 #  1. build da imagem nova enquanto o container atual segue no ar;
 #  2. sobe o container novo em espera (fora da rede do Traefik): não lê data/ nem prepara músicas;
-#  3. tira o antigo da rede, ativa o novo (que só então lê fila, votos e músicas do disco)
-#     e passa o alias palco-live para ele. O retry do Traefik segura os requests desse
-#     meio segundo; só a conexão ao vivo (WebSocket) cai e volta sozinha;
+#  3. para o antigo, ativa o novo (que só então lê fila, votos e músicas do disco) e passa
+#     o alias palco-live para ele. O retry do Traefik segura os requests desse segundo;
+#     só a conexão ao vivo (WebSocket) fecha e volta sozinha;
 #  4. se o novo não subir, o antigo continua (ou volta) no ar.
 {
 set -e
@@ -34,14 +34,14 @@ until [ "$(health)" = 503 ]; do
   sleep 0.5
 done
 
-# Troca
-for c in $OLD; do docker network disconnect easypanel "$c" 2>/dev/null || true; done
-sleep 0.3  # algum request que o antigo ainda esteja terminando
-if ! docker exec "$NEW" curl -fs -o /dev/null -X POST http://localhost:8000/api/activate \
-   || ! docker network connect --alias palco-live easypanel "$NEW"; then
+# Troca: o antigo para ainda na rede, para fechar os WebSockets direito (os navegadores
+# reconectam sozinhos), terminar o que estava em andamento e recusar conexões novas, que o
+# retry do Traefik segura. Aí o novo lê o estado do disco e assume o alias palco-live.
+[ -n "$OLD" ] && docker stop -t 5 $OLD >/dev/null
+if ! docker exec "$NEW" curl -fs -o /dev/null -X POST http://localhost:8000/api/activate \n   || ! docker network connect --alias palco-live easypanel "$NEW"; then
   echo "Ativação falhou; voltando o antigo."; docker logs --tail 30 "$NEW"
   docker rm -f "$NEW" >/dev/null; rm -f "$DATA/standby-$NEW"
-  for c in $OLD; do docker network connect --alias palco-live easypanel "$c"; done
+  [ -n "$OLD" ] && docker start $OLD >/dev/null
   exit 1
 fi
 [ -n "$OLD" ] && docker rm -f $OLD >/dev/null
