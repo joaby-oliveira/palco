@@ -81,9 +81,8 @@ watchState((s) => {
   $("session-url").textContent = s.session_url;
   const n = s.party.online;
   $("online-count").textContent = n === 1 ? "1 na festa" : `${n} na festa`;
-  Fx.setFiles(s.fx.files);
   Fx.setSounds(s.fx.sounds);
-  renderSoundBoard($("fx-sounds"), s.fx.sounds || []);
+  renderSoundBoard($("fx-sounds"), s.fx, { keys: true });
   Fx.setVolume(s.config.fx_volume ?? 0.7);
   renderAlert();
   renderHero();
@@ -91,7 +90,7 @@ watchState((s) => {
   renderPreparing();
   renderLibrary();
 }, (fx) => {
-  Fx.play(fx.name);
+  Fx.play(fx.name, fx.client);
   if (fx.name !== "stop") fxToast(`${fx.label || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
 });
 
@@ -299,9 +298,6 @@ async function removeSong(s) {
 
 // ---------- Mesa de efeitos ----------
 
-const fxKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-$("fx-pads").replaceChildren(...FX_PADS.map(([name, label, color], i) => h("button", { class: `pad ${color}`, onclick: () => fireFx(name) },
-  h("span", {}, label), fxKeys[i] ? h("span", { class: "key" }, fxKeys[i]) : null)));
 $("open-fx").addEventListener("click", () => { Fx.play(""); $("fx-dlg").showModal(); });
 
 // ---------- Escolher letra ----------
@@ -453,7 +449,7 @@ async function openSettings() {
     body.querySelectorAll(".prov").forEach((b) => b.classList.toggle("active", b.contains(r) && r.checked));
   }));
   $("fx-volume").addEventListener("input", (e) => Fx.setVolume(parseFloat(e.target.value)));
-  $("fx-volume").addEventListener("change", () => Fx.play("aplausos"));
+  $("fx-volume").addEventListener("change", () => Fx.play(STATE.fx.favorites[0]));
   $("settings").showModal();
 }
 

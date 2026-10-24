@@ -13,11 +13,13 @@ from . import config, store
 
 COLORS = ["#FFC93C", "#FF4FA3", "#7FB2FF", "#5BE3A1", "#FF8A5B", "#C9A2FF", "#FFE08A", "#7FE3E3"]
 VOTE_WINDOW = 25  # segundos depois do fim em que ainda dá para votar
-FX = {
-    "aplausos": "Aplausos", "uhuu": "Uhuuu!", "risada": "Risada da plateia", "buzina": "Buzina",
-    "rufar": "Rufar", "errou": "Errou!", "ooo": "Ôôôô", "sirene": "Sirene", "grilo": "Grilo",
-    "tchan": "Tchan tchan tchan", "vaia": "Vaia", "fogos": "Fogos",
-}
+# Seção principal da mesa de efeitos quando ninguém mexeu nos favoritos ainda
+DEFAULT_FAVORITES = [
+    "vine-boom", "anime-wow-sound-effect-mp3cut", "vaias", "ui-rodrigo-faro", "uepa-mp3cut",
+    "risada-do-gato", "original-fah", "parei-familia-e-mafia", "love-me-intro",
+    "comedy-male-yelling-yee-ha-sound-effects-free-download-mp3cut", "fogos-caruaru-foguete-12x1-8",
+    "applause_2", "efeitos-sonoros-brasil-sil-sil-rede-globo", "chicken-on-tree-screaming",
+]
 
 _lock = threading.RLock()
 _guests: dict[str, dict] = {}
@@ -199,19 +201,24 @@ def snapshot(client: str) -> dict:
 # ---------- Efeitos sonoros ----------
 
 def fx(name: str, client: str):
-    """Toca um efeito no telão: um dos sintetizados, um som da pasta data/sounds ou "stop" (cala tudo)."""
+    """Toca um som de data/sounds no telão, ou "stop" (cala tudo)."""
     global fx_event
     custom = {s["id"]: s for s in sounds()}
-    if name != "stop" and name not in FX and name not in custom:
-        raise KeyError("Efeito desconhecido.")
-    label = FX.get(name) or (custom[name]["name"] if name in custom else "Silêncio")
-    fx_event = {"seq": next(_fx_seq), "name": name, "label": label, "by": singer(client)["name"]}
+    if name != "stop" and name not in custom:
+        raise KeyError("Som desconhecido.")
+    label = custom[name]["name"] if name in custom else "Silêncio"
+    # O cliente vai junto: um som novo da mesma pessoa corta o anterior dela
+    fx_event = {"seq": next(_fx_seq), "name": name, "label": label, "client": client, "by": singer(client)["name"]}
+
+
+def _sounds_dir():
+    return config.DATA_DIR / "sounds"
 
 
 def sounds() -> list[dict]:
-    """Sons próprios em data/sounds: os listados em sounds.json (com nome e cor) e
+    """Sons em data/sounds: os listados em sounds.json (com nome e cor) e
     qualquer outro .mp3/.wav/.ogg jogado na pasta (o nome vem do arquivo)."""
-    d = config.DATA_DIR / "sounds"
+    d = _sounds_dir()
     if not d.exists():
         return []
     listed = []
@@ -225,12 +232,20 @@ def sounds() -> list[dict]:
     return listed
 
 
-def fx_files() -> dict[str, str]:
-    """Áudios próprios em data/fx/<nome>.mp3 (ou .wav/.ogg) substituem o som sintetizado."""
-    d = config.DATA_DIR / "fx"
-    out = {}
-    if d.exists():
-        for f in d.iterdir():
-            if f.stem in FX and f.suffix.lower() in (".mp3", ".wav", ".ogg"):
-                out[f.stem] = f.name
-    return out
+def favorites() -> list[str]:
+    """Sons da seção principal, na ordem (as teclas 1 a 0 do palco seguem essa ordem)."""
+    f = _sounds_dir() / "favorites.json"
+    ids = json.loads(f.read_text(encoding="utf-8")) if f.exists() else DEFAULT_FAVORITES
+    have = {s["id"] for s in sounds()}
+    return [i for i in ids if i in have]
+
+
+def set_favorite(sound_id: str, fav: bool):
+    if sound_id not in {s["id"] for s in sounds()}:
+        raise KeyError("Som desconhecido.")
+    with _lock:
+        ids = [i for i in favorites() if i != sound_id]
+        if fav:
+            ids.append(sound_id)
+        (_sounds_dir() / "favorites.json").write_text(json.dumps(ids, ensure_ascii=False, indent=1), encoding="utf-8")
+    store.touch()

@@ -48,7 +48,7 @@ watchState((s) => {
   renderMyTurn();
   renderQueue();
   renderLibrary();
-  renderSoundBoard($("sounds"), s.fx.sounds || []);
+  renderSoundBoard($("sounds"), s.fx, { preview: true });
 });
 
 const mine = (e) => e.client === CLIENT;
@@ -140,14 +140,8 @@ function renderLibrary() {
 
 // ---------- Efeitos ----------
 
-$("pads").replaceChildren(...FX_PADS.map(([name, label, color]) => {
-  const b = h("button", { class: `pad ${color}` }, h("span", {}, label));
-  b.addEventListener("click", async () => {
-    b.classList.add("hit");
-    setTimeout(() => b.classList.remove("hit"), 150);
-    if (navigator.vibrate) navigator.vibrate(20);
-    try { await api(`/api/fx/${name}`, { method: "POST" }); } catch (err) { toast(err.message, true); }
-  });
-  return b;
-}));
+// Vibra de leve ao disparar um som (o botão de ouvir não dispara nada no telão)
+document.addEventListener("click", (e) => {
+  if (e.target.closest && e.target.closest(".pad.snd") && navigator.vibrate) navigator.vibrate(20);
+});
 

@@ -80,16 +80,11 @@ const ICONS = {
   image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 16l-5-5-9 9"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   wand: '<path d="M4 20L16 8M14 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 11l.7 1.3L21 13l-1.3.7L19 15l-.7-1.3L17 13l1.3-.7z"/>',
+  headphones: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/>',
+  starOn: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z" fill="currentColor"/>',
   star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
 };
 
-// Botões de efeito da festa, na ordem e com as cores da mesa
-const FX_PADS = [
-  ["aplausos", "Aplausos", "gold"], ["uhuu", "Uhuuu!", "pink"], ["risada", "Risada da plateia", "blue"],
-  ["buzina", "Buzina", "orange"], ["rufar", "Rufar", "green"], ["errou", "Errou!", "white"],
-  ["ooo", "Ôôôô", "plum"], ["sirene", "Sirene", "pink"], ["grilo", "Grilo", "plum"],
-  ["tchan", "Tchan tchan tchan", "blue"], ["vaia", "Vaia", "plum"], ["fogos", "Fogos", "gold"],
-];
 
 function icon(name, size = 20) {
   const s = document.createElement("span");
@@ -124,26 +119,70 @@ function fireFx(name) {
   return api(`/api/fx/${encodeURIComponent(name)}`, { method: "POST" }).catch((e) => toast(e.message, true));
 }
 
-// Mesa com os sons próprios (data/sounds): busca + grade de botões + parar tudo.
+// Prévia no próprio aparelho (só o celular ouve; nada sai no telão)
+let previewSound = null;
+function previewFx(sound, btn) {
+  const same = previewSound && previewSound.id === sound.id;
+  if (previewSound) { previewSound.audio.pause(); previewSound.btn.replaceChildren(icon("headphones", 16)); previewSound = null; }
+  if (same) return;
+  const audio = new Audio(`/media/sounds/${encodeURIComponent(sound.file)}`);
+  previewSound = { id: sound.id, audio, btn };
+  btn.replaceChildren(icon("stop", 14));
+  audio.onended = () => { if (previewSound && previewSound.audio === audio) { btn.replaceChildren(icon("headphones", 16)); previewSound = null; } };
+  audio.play().catch(() => toast("Não consegui tocar a prévia.", true));
+}
+
+function setFavorite(id, fav) {
+  return api(`/api/sounds/${encodeURIComponent(id)}/favorite`, { method: "POST", body: { fav } }).catch((e) => toast(e.message, true));
+}
+
+// Mesa de sons: a seção principal (favoritos) e "Seus sons" (o resto, com busca).
+// opts.preview: botão de ouvir no aparelho; opts.keys: mostra as teclas 1 a 0.
 // Só redesenha quando a lista muda, para não perder o que foi digitado na busca.
-function renderSoundBoard(box, sounds) {
-  const key = sounds.map((s) => s.id).join("|");
+function renderSoundBoard(box, fx, opts = {}) {
+  const sounds = fx.sounds || [];
+  const favs = fx.favorites || [];
+  const key = sounds.map((s) => s.id).join("|") + "#" + favs.join("|");
   if (box.dataset.key === key) return;
   box.dataset.key = key;
-  if (!sounds.length) { box.replaceChildren(); return; }
-  const input = h("input", { type: "search", class: "lib-filter", placeholder: `Procurar entre ${sounds.length} sons`, "aria-label": "Procurar som" });
+  const byId = Object.fromEntries(sounds.map((s) => [s.id, s]));
+  const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+
+  const pad = (s, fav, i) => {
+    const tools = h("span", { class: "pad-tools" });
+    if (opts.preview) {
+      const b = h("button", { class: "tool", title: "Ouvir só aqui", "aria-label": `Ouvir ${s.name} só no celular` }, icon("headphones", 16));
+      b.addEventListener("click", () => previewFx(s, b));
+      tools.append(b);
+    }
+    tools.append(h("button", {
+      class: "tool", title: fav ? "Tirar da seção principal" : "Pôr na seção principal",
+      "aria-label": `${fav ? "Tirar" : "Pôr"} ${s.name} ${fav ? "da" : "na"} seção principal`,
+      onclick: () => setFavorite(s.id, !fav),
+    }, icon(fav ? "starOn" : "star", 16)));
+    return h("div", { class: "pad-wrap" },
+      h("button", { class: `pad snd ${paletteFor(s.color)}`, onclick: () => fireFx(s.id) },
+        h("span", {}, s.name), opts.keys && fav && KEYS[i] ? h("span", { class: "key" }, KEYS[i]) : null),
+      tools);
+  };
+
+  const main = favs.map((id, i) => pad(byId[id], true, i));
+  const rest = sounds.filter((s) => !favs.includes(s.id));
+  const input = h("input", { type: "search", class: "lib-filter", placeholder: `Procurar entre ${rest.length} sons`, "aria-label": "Procurar som" });
   const grid = h("div", { class: "pads sounds" });
   const draw = () => {
     const q = input.value.trim().toLowerCase();
-    const list = sounds.filter((s) => !q || s.name.toLowerCase().includes(q));
-    grid.replaceChildren(...list.map((s) => h("button", { class: `pad snd ${paletteFor(s.color)}`, onclick: () => fireFx(s.id) }, h("span", {}, s.name))));
-    if (!list.length) grid.append(h("p", { class: "empty" }, "Nenhum som com esse nome."));
+    const list = rest.filter((s) => !q || s.name.toLowerCase().includes(q));
+    grid.replaceChildren(...list.map((s) => pad(s, false)));
+    if (!list.length) grid.append(h("p", { class: "empty" }, q ? "Nenhum som com esse nome." : "Todos os sons estão na seção principal."));
   };
   input.addEventListener("input", draw);
   draw();
   box.replaceChildren(
-    h("div", { class: "sound-head" }, h("h3", { class: "h-section", style: "font-size:16px" }, "SEUS SONS"),
+    h("div", { class: "sound-head" }, h("h3", { class: "h-section", style: "font-size:16px" }, "PRINCIPAIS"),
       h("button", { class: "btn sm danger", onclick: () => fireFx("stop") }, icon("stop", 14), "Parar sons")),
+    main.length ? h("div", { class: "pads sounds" }, ...main) : h("p", { class: "empty" }, "Toque na estrela de um som para trazer ele pra cá."),
+    h("div", { class: "sound-head", style: "margin-top:14px" }, h("h3", { class: "h-section", style: "font-size:16px" }, "SEUS SONS")),
     input, grid);
 }
 

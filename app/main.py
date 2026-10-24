@@ -68,7 +68,7 @@ def state(host: bool, client: str = "") -> dict:
         "session_url": session_url(),
         "is_host": host,
         "party": party.snapshot(client),
-        "fx": {"names": party.FX, "files": party.fx_files(), "sounds": party.sounds()},
+        "fx": {"sounds": party.sounds(), "favorites": party.favorites()},
     }
 
 
@@ -295,12 +295,14 @@ def fx(name: str, request: Request):
     return {"ok": True}
 
 
-@app.get("/media/fx/{name}")
-def fx_file(name: str):
-    f = party.fx_files().get(Path(name).stem)
-    if not f or f != name:
-        raise HTTPException(404)
-    return FileResponse(config.DATA_DIR / "fx" / f)
+@app.post("/api/sounds/{sound_id}/favorite")
+def favorite(sound_id: str, body: dict = Body(...)):
+    """Põe ou tira um som da seção principal da mesa (vale para todo mundo da festa)."""
+    try:
+        party.set_favorite(sound_id, bool(body.get("fav")))
+    except KeyError as e:
+        raise HTTPException(404, str(e.args[0]))
+    return {"favorites": party.favorites()}
 
 
 @app.get("/media/sounds/{name}")

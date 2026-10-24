@@ -349,10 +349,13 @@ $("controls").addEventListener("mouseleave", wake);
 // ---------- Efeitos sonoros ----------
 
 const FX_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-$("fx-rail").replaceChildren(...FX_PADS.slice(0, 6).map(([name, label, color], i) => h("button", { class: `pad ${color}`, onclick: () => fireFx(name), title: `Tecla ${FX_KEYS[i]}` },
-  h("span", {}, label.split(" ")[0]), h("span", { class: "key" }, FX_KEYS[i]))),
-  h("button", { class: "pad plum more", onclick: () => { $("sounds-dlg").showModal(); wake(); }, title: "Todos os sons (S)" }, h("span", {}, "Mais sons"), h("span", { class: "key" }, "S")));
-$("dlg-pads").replaceChildren(...FX_PADS.map(([name, label, color]) => h("button", { class: `pad ${color}`, onclick: () => fireFx(name) }, h("span", {}, label))));
+// Coluna lateral: os 6 primeiros da seção principal + "Mais sons"
+function renderRail(fx) {
+  const byId = Object.fromEntries((fx.sounds || []).map((s) => [s.id, s]));
+  $("fx-rail").replaceChildren(...(fx.favorites || []).slice(0, 6).map((id, i) => h("button", { class: `pad ${paletteFor(byId[id].color)}`, onclick: () => fireFx(id), title: `${byId[id].name} (tecla ${FX_KEYS[i]})` },
+    h("span", { class: "rail-name" }, byId[id].name), h("span", { class: "key" }, FX_KEYS[i]))),
+    h("button", { class: "pad plum more", onclick: () => { $("sounds-dlg").showModal(); wake(); }, title: "Todos os sons (S)" }, h("span", {}, "Mais sons"), h("span", { class: "key" }, "S")));
+}
 document.querySelector("[data-dlg-close]").addEventListener("click", () => $("sounds-dlg").close());
 
 // ---------- Teclado ----------
@@ -371,7 +374,7 @@ document.addEventListener("keydown", (e) => {
   if ($("sounds-dlg").open) return;
   if (e.key === "s" || e.key === "S") { $("sounds-dlg").showModal(); return; }
   const fxIdx = FX_KEYS.indexOf(e.key);
-  if (fxIdx >= 0 && !e.ctrlKey && !e.altKey && !e.metaKey) { fireFx(FX_PADS[fxIdx][0]); return; }
+  if (fxIdx >= 0 && !e.ctrlKey && !e.altKey && !e.metaKey) { const id = STATE && STATE.fx.favorites[fxIdx]; if (id) fireFx(id); return; }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   else if (e.key === "f" || e.key === "F") toggleFullscreen();
   else if (e.key === "ArrowRight") seek(now() + 5);
@@ -410,12 +413,12 @@ function renderParty() {
 
 watchState((s) => {
   STATE = s;
-  Fx.setFiles(s.fx.files);
   Fx.setSounds(s.fx.sounds);
-  renderSoundBoard($("dlg-sounds"), s.fx.sounds || []);
+  renderSoundBoard($("dlg-sounds"), s.fx, { keys: true });
+  renderRail(s.fx);
   renderParty();
 }, (fx) => {
-  Fx.play(fx.name);
+  Fx.play(fx.name, fx.client);
   if (fx.name !== "stop") fxToast(`${fx.label || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
 });
 
@@ -472,7 +475,9 @@ async function showFinal() {
   $("final").hidden = false;
   stage.classList.remove("idle");
   confetti();
-  Fx.play("aplausos");
+  // Aplausos no fim (de quem tiver na pasta), num canal só do palco
+  const claps = ["claps-with-cheers-audience", "applause_2"].find((id) => STATE && STATE.fx.sounds.some((s) => s.id === id));
+  if (claps) Fx.play(claps, "palco");
   // Contagem para chamar o próximo sozinho
   finalCount = 15;
   renderFinal();

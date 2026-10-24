@@ -36,19 +36,19 @@ Na primeira vez, o Windows pergunta se o Python pode usar a rede: permita em
 
 ## Efeitos sonoros
 
-Os sons são sintetizados no navegador, sem arquivos. Para usar um som de
-verdade, coloque um arquivo em `data/fx/` com o nome do efeito (`aplausos`,
-`uhuu`, `risada`, `buzina`, `rufar`, `errou`, `ooo`, `sirene`, `grilo`,
-`tchan`, `vaia`, `fogos`) e extensão `.mp3`, `.wav` ou `.ogg`. No palco, as
-teclas 1 a 9 e 0 disparam os dez primeiros.
+Os sons ficam em `data/sounds/` (fora do git). O `sounds.json` dá nome e cor a
+cada arquivo; um áudio jogado na pasta sem estar nele entra com o nome do
+arquivo.
 
-### Seus sons
-
-Qualquer áudio em `data/sounds/` aparece em **Seus sons**, na aba Efeitos do
-celular, na mesa de efeitos do telão e no palco (botão **Mais sons** ou tecla
-S). O `data/sounds/sounds.json` dá nome e cor a cada arquivo; um arquivo que
-não estiver nele entra com o nome do arquivo. **Parar sons** cala tudo que
-estiver tocando (bom para os sons longos).
+- **Principais**: a seção de cima da mesa, igual para todo mundo da festa. A
+  estrela tira um som dela; em **Seus sons**, a estrela traz o som para ela. A
+  ordem fica em `data/sounds/favorites.json`. No palco, os 6 primeiros ficam na
+  coluna lateral, as teclas 1 a 9 e 0 disparam os dez primeiros e **Mais sons**
+  (ou a tecla S) abre a mesa inteira.
+- Cada pessoa tem o seu canal: um som novo dela corta o anterior dela, sem
+  mexer no som dos outros. **Parar sons** cala tudo.
+- No celular, o fone em cada botão toca uma prévia só no próprio celular, para
+  saber qual é o som antes de soltar no telão.
 
 ## Versão karaokê e uso sem separação
 
@@ -102,8 +102,8 @@ Para adicionar outro serviço, crie um arquivo em `app/providers/` seguindo o
 ## Arquivos
 
 - `app/`: servidor (FastAPI). `party.py` é a festa (convidados, fila do palco,
-  votos, efeitos); `worker.py` é a fila de preparo; `providers/` os serviços.
+  votos, sons); `worker.py` é a fila de preparo; `providers/` os serviços.
 - `static/`: telão (`index.html`), palco (`player.html`), celular
-  (`mobile.html`) e os efeitos (`fx.js`).
+  (`mobile.html`) e os sons do telão (`fx.js`).
 - `data/`: biblioteca, faixas separadas, convidados e configurações (não vai
   para o git).
