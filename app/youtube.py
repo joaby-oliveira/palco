@@ -8,6 +8,13 @@ import yt_dlp
 from . import config
 
 _QUIET = {"quiet": True, "no_warnings": True, "noprogress": True}
+# Em servidor (IP de datacenter) o YouTube pede login: um cookies.txt exportado do
+# navegador nesse caminho resolve. Em casa não precisa.
+COOKIES = config.DATA_DIR / "youtube-cookies.txt"
+
+
+def _base() -> dict:
+    return {**_base(), "cookiefile": str(COOKIES)} if COOKIES.exists() else dict(_QUIET)
 
 
 def _video_id(text: str) -> str | None:
@@ -29,7 +36,7 @@ def _entry(e: dict) -> dict:
 
 def search(query: str) -> list[dict]:
     vid = _video_id(query)
-    with yt_dlp.YoutubeDL({**_QUIET, "extract_flat": True, "skip_download": True}) as ydl:
+    with yt_dlp.YoutubeDL({**_base(), "extract_flat": True, "skip_download": True}) as ydl:
         if vid:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
             return [_entry(info)]
@@ -41,7 +48,7 @@ def preview(video_id: str, dest: Path) -> Path:
     """Recorta 5 segundos do meio da música para a prévia."""
     if dest.exists():
         return dest
-    with yt_dlp.YoutubeDL({**_QUIET, "format": "bestaudio/best"}) as ydl:
+    with yt_dlp.YoutubeDL({**_base(), "format": "bestaudio/best"}) as ydl:
         info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
     start = max(0, int((info.get("duration") or 60) / 2))
     headers = "".join(f"{k}: {v}\r\n" for k, v in (info.get("http_headers") or {}).items())
@@ -64,7 +71,7 @@ def download_audio(video_id: str, out_dir: Path, progress) -> Path:
             progress(min(1.0, (d.get("downloaded_bytes") or 0) / total))
 
     opts = {
-        **_QUIET,
+        **_base(),
         "format": "bestaudio/best",
         "outtmpl": str(out_dir / "source.%(ext)s"),
         "progress_hooks": [hook],
@@ -92,7 +99,7 @@ def download_video(video_id: str, out_dir: Path, progress) -> Path:
             done["parts"] += 1
 
     opts = {
-        **_QUIET,
+        **_base(),
         "format": "bv*+ba/b",
         "format_sort": ["res:720", "fps:30", "vcodec:h264", "acodec:aac"],
         "merge_output_format": "mp4",

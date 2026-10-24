@@ -187,3 +187,7 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
   vez (fica num cookie por um ano). Sem a chave, o navegador é convidado.
 - `HTTPS_PORT=0` (já é o padrão da imagem): sem a porta 8443 com certificado
   próprio, porque o domínio já tem HTTPS.
+- YouTube bloqueando o download ("Sign in to confirm you're not a bot"),
+  comum em IP de datacenter: exporte os cookies do YouTube com a extensão
+  "Get cookies.txt LOCALLY" (de preferência numa conta secundária) e salve
+  como `data/youtube-cookies.txt`. Vale na hora, sem reiniciar.
