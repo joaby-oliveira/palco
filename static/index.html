@@ -3,89 +3,148 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Karaoke</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
-<link rel="stylesheet" href="/static/style.css?v=2">
+<title>Palco · Karaokê</title>
+<link rel="icon" href="/static/disco.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 <body>
+<div class="beams" aria-hidden="true"><span></span><span></span></div>
+
 <div class="wrap">
+  <header class="top">
+    <a class="brand" href="/" aria-label="Palco, início">
+      <img src="/static/disco.svg" width="44" height="48" alt="">
+      <span><span class="name">PALCO</span><span class="tag" style="display:block">o animador da sua festa</span></span>
+    </a>
 
-  <!-- Tela principal -->
-  <div id="view-home">
-    <header class="top">
-      <h1>🎤 Karaoke</h1>
-      <div class="top-right">
-        <button class="usage-chip" id="usage" hidden title="Uso do serviço de separação hoje"></button>
-        <span>Separação</span>
-        <select id="provider" title="Serviço que separa a voz do instrumental"></select>
-        <button class="icon-btn" id="open-settings" title="Configurações">⚙</button>
+    <form class="searchbar" id="search-form" role="search">
+      <i data-icon="search"></i>
+      <label class="sr-only" for="search-input">Buscar música ou colar link do YouTube</label>
+      <input type="text" id="search-input" placeholder="Qual vai ser? Música, artista ou link do YouTube" autocomplete="off">
+      <div class="seg" role="group" aria-label="Tipo de versão">
+        <button type="button" data-kind="original" class="on" aria-pressed="true">Original</button>
+        <button type="button" data-kind="karaoke" aria-pressed="false" title="Vídeos que já são instrumentais: não gastam separação">Já é karaokê</button>
       </div>
-    </header>
-
-    <details class="card">
-      <summary>📱 Entrar na sessão</summary>
-      <div class="inner">
-        <div class="qr"><img src="/api/qr.svg" alt="QR code da sessão"></div>
-        <div>
-          <p style="margin-top:0">Escaneie com o celular para adicionar músicas.<br>Precisa estar no mesmo Wi-Fi.</p>
-          <p class="sub" id="session-url"></p>
-        </div>
-      </div>
-    </details>
-
-    <form class="card" id="search-form">
-      <div class="seg kinds" role="group" aria-label="Tipo de música">
-        <button type="button" data-kind="original" class="on">Música original</button>
-        <button type="button" data-kind="karaoke">Versão karaokê</button>
-      </div>
-      <label class="small" for="search-input">Link do YouTube ou nome da música</label>
-      <div class="row">
-        <input type="text" id="search-input" placeholder="Digite o nome do artista ou música..." autocomplete="off">
-        <button class="btn" type="submit">Buscar</button>
-      </div>
-      <div class="results" id="results"></div>
+      <button class="btn pink" type="submit">Buscar</button>
     </form>
 
-    <div id="queue-section" hidden>
-      <div class="section-head"><h2>Músicas a processar</h2></div>
-      <div id="queue"></div>
+    <div class="top-actions">
+      <button class="alert-chip" id="alert-chip" hidden></button>
+      <a class="people-chip" href="#invite" title="Entrar pelo celular">
+        <span class="qr-mini"><img src="/api/qr.svg" alt=""></span>
+        <span><b id="online-count">0 na festa</b><small>entrar pelo celular</small></span>
+      </a>
+      <button class="icon-btn" id="open-settings" title="Ajustes do anfitrião" aria-label="Ajustes do anfitrião"><i data-icon="sliders" data-size="22"></i></button>
+    </div>
+  </header>
+
+  <!-- Tela principal -->
+  <div id="view-home" style="display:flex;flex-direction:column;gap:28px">
+    <section class="card results-panel" id="results-panel" hidden aria-label="Resultados da busca">
+      <div class="section-head" style="margin:0">
+        <h2 class="h-section">RESULTADOS</h2>
+        <button class="icon-btn sm" id="close-results" aria-label="Fechar resultados"><i data-icon="x" data-size="18"></i></button>
+      </div>
+      <div class="results" id="results"></div>
+    </section>
+
+    <div class="stage-row">
+      <section class="hero" id="hero" aria-labelledby="hero-label">
+        <div class="bulbs" aria-hidden="true"></div>
+        <div id="hero-content"></div>
+      </section>
+
+      <aside class="card queue-panel" aria-labelledby="queue-title">
+        <div class="section-head" style="margin:0;align-items:baseline">
+          <h2 class="h-section" id="queue-title">FILA DA FESTA</h2>
+          <span class="sub" id="queue-eta"></span>
+        </div>
+        <ol class="queue-list" id="stage-queue"></ol>
+        <div id="preparing-wrap" hidden>
+          <div class="sub" style="margin:4px 0 8px;font-weight:600">Preparando no repertório</div>
+          <ul class="queue-list" id="preparing"></ul>
+        </div>
+        <div class="invite" id="invite">
+          <div class="qr"><img src="/api/qr.svg" alt="QR code para entrar na festa"></div>
+          <div>
+            <div class="title">CHAMA A GALERA</div>
+            <p>Aponta a câmera, escolhe a música e entra na fila. Mesmo Wi-Fi.</p>
+            <div class="url" id="session-url"></div>
+          </div>
+        </div>
+      </aside>
     </div>
 
-    <div class="section-head">
-      <h2>Biblioteca</h2>
-      <input type="search" id="lib-filter" placeholder="Pesquisar...">
-    </div>
-    <div id="library"></div>
+    <section aria-labelledby="modes-title">
+      <div class="section-head"><h2 class="h-section" id="modes-title">O QUE ROLA HOJE</h2></div>
+      <div class="modes">
+        <a class="mode on" href="#repertorio">
+          <i data-icon="mic" data-size="34"></i>
+          <span class="name">KARAOKÊ</span>
+          <span class="desc" id="ready-count">Ativo</span>
+        </a>
+        <button type="button" class="mode" id="open-fx">
+          <i data-icon="pads" data-size="34"></i>
+          <span class="name">MESA DE EFEITOS</span>
+          <span class="desc">Aplausos, buzina, risada de auditório. No celular também.</span>
+        </button>
+        <div class="mode soon">
+          <i data-icon="duel" data-size="34"></i>
+          <span class="name">DUELO</span>
+          <span class="desc">Em breve · dois cantores, a galera vota</span>
+        </div>
+        <div class="mode soon">
+          <i data-icon="dance" data-size="34"></i>
+          <span class="name">DANÇA</span>
+          <span class="desc">Em breve · com câmera ou Kinect</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="repertorio" aria-labelledby="rep-title">
+      <div class="section-head">
+        <h2 class="h-section" id="rep-title">REPERTÓRIO</h2>
+        <div class="chips" id="lib-chips">
+          <input type="search" class="lib-filter" id="lib-filter" placeholder="Procurar no repertório" aria-label="Procurar no repertório">
+          <button class="chip on" data-filter="all"></button>
+          <button class="chip" data-filter="ready"></button>
+          <button class="chip warn" data-filter="fix"></button>
+        </div>
+      </div>
+      <div class="library" id="library"></div>
+    </section>
   </div>
 
   <!-- Escolher letra -->
-  <div id="view-lyrics" hidden>
-    <a class="back" data-back>← voltar</a>
-    <h1 id="lyrics-song" style="margin:0 0 20px"></h1>
+  <div id="view-lyrics" hidden style="display:flex;flex-direction:column;gap:20px">
+    <a class="back" data-back><i data-icon="back" data-size="18"></i>voltar</a>
+    <h1 class="display" id="lyrics-song" style="margin:0;font-size:34px"></h1>
     <div class="card">
-      <h2 style="margin-top:0">Escolha a letra</h2>
+      <h2 class="h-section" style="margin-bottom:14px">ESCOLHE A LETRA</h2>
       <form class="row" id="lyrics-form" style="margin-bottom:14px">
-        <input type="text" id="lyrics-q" placeholder="Buscar outra letra (artista e música)">
+        <input type="text" id="lyrics-q" placeholder="Buscar outra letra (artista e música)" aria-label="Buscar outra letra">
         <button class="btn ghost" type="submit">Buscar</button>
       </form>
       <div id="lyrics-list"></div>
     </div>
     <form class="card" id="paste-form">
-      <h2 style="margin-top:0">Ou cole a letra</h2>
-      <p class="sub" style="margin-top:0">Texto simples (uma linha por verso) ou LRC com tempos. Depois sincronize no player com <b>Gravar sincronia</b>.</p>
-      <textarea id="paste-text" placeholder="Cole a letra aqui..."></textarea>
-      <div style="margin-top:10px;text-align:right"><button class="btn" type="submit">Usar esta letra</button></div>
+      <h2 class="h-section" style="margin-bottom:8px">OU COLA A LETRA</h2>
+      <p class="sub" style="margin-top:0">Texto simples (uma linha por verso) ou LRC com tempos. Depois acerte o tempo no palco com <b>Acertar letra</b>.</p>
+      <textarea id="paste-text" placeholder="Cole a letra aqui…" aria-label="Letra"></textarea>
+      <div style="margin-top:12px;text-align:right"><button class="btn" type="submit">Usar esta letra</button></div>
     </form>
   </div>
 
   <!-- Escolher capa -->
-  <div id="view-cover" hidden>
-    <a class="back" data-back>← voltar</a>
-    <h1 id="cover-song" style="margin:0 0 20px"></h1>
+  <div id="view-cover" hidden style="display:flex;flex-direction:column;gap:20px">
+    <a class="back" data-back><i data-icon="back" data-size="18"></i>voltar</a>
+    <h1 class="display" id="cover-song" style="margin:0;font-size:34px"></h1>
     <div class="card">
-      <h2 style="margin-top:0">Escolha a capa</h2>
+      <h2 class="h-section" style="margin-bottom:14px">ESCOLHE A CAPA</h2>
       <form class="row" id="cover-form" style="margin-bottom:14px">
-        <input type="text" id="cover-q" placeholder="Buscar outra capa (álbum ou artista)">
+        <input type="text" id="cover-q" placeholder="Buscar outra capa (álbum ou artista)" aria-label="Buscar outra capa">
         <button class="btn ghost" type="submit">Buscar</button>
       </form>
       <div class="covers" id="cover-list"></div>
@@ -93,8 +152,24 @@
   </div>
 </div>
 
+<!-- Ficha da música -->
+<dialog id="song-dlg">
+  <div class="dlg-head"><h3>MÚSICA</h3><button class="icon-btn sm" data-close aria-label="Fechar"><i data-icon="x" data-size="18"></i></button></div>
+  <div class="dlg-body" id="song-body"></div>
+</dialog>
+
+<!-- Mesa de efeitos -->
+<dialog id="fx-dlg" style="width:min(520px, calc(100vw - 32px))">
+  <div class="dlg-head"><h3>MESA DE EFEITOS</h3><button class="icon-btn sm" data-close aria-label="Fechar"><i data-icon="x" data-size="18"></i></button></div>
+  <div class="dlg-body">
+    <p class="sub" style="margin-top:0">Atalhos no palco: teclas 1 a 9 e 0. Os convidados também tocam pelo celular, na aba Efeitos.</p>
+    <div class="pads" id="fx-pads"></div>
+  </div>
+</dialog>
+
+<!-- Ajustes do anfitrião -->
 <dialog id="settings">
-  <div class="dlg-head"><h3>Configurações</h3><button class="icon-btn" data-close>✕</button></div>
+  <div class="dlg-head"><h3>AJUSTES DO ANFITRIÃO</h3><button class="icon-btn sm" data-close aria-label="Fechar"><i data-icon="x" data-size="18"></i></button></div>
   <div class="dlg-body" id="settings-body"></div>
   <div class="dlg-foot">
     <button class="btn ghost" data-close>Cancelar</button>
@@ -102,7 +177,8 @@
   </div>
 </dialog>
 
-<script src="/static/common.js?v=2"></script>
-<script src="/static/app.js?v=2"></script>
+<script src="/static/common.js?v=3"></script>
+<script src="/static/fx.js?v=3"></script>
+<script src="/static/app.js?v=3"></script>
 </body>
 </html>

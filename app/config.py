@@ -39,6 +39,10 @@ DEFAULTS = {
     "search_results": 5,
     # Atraso do som na caixa Bluetooth, em segundos (a letra espera por ele)
     "bt_delay": 0.0,
+    # Nome de quem está no notebook, para a fila da festa
+    "host_name": "Anfitrião",
+    # Volume dos efeitos sonoros (0 a 1)
+    "fx_volume": 0.7,
     "port": 8000,
 }
 

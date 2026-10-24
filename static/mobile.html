@@ -2,79 +2,82 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Karaoke</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
-<link rel="stylesheet" href="/static/style.css?v=2">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#110A1C">
+<title>Palco · Pedir música</title>
+<link rel="icon" href="/static/disco.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/mobile.css?v=3">
 </head>
 <body>
-<div class="wrap">
-  <header class="top"><h1>🎤 Karaoke</h1></header>
-
-  <form class="card" id="search-form">
-    <div class="seg kinds" role="group" aria-label="Tipo de música">
-      <button type="button" data-kind="original" class="on">Música original</button>
-      <button type="button" data-kind="karaoke">Versão karaokê</button>
-    </div>
-    <label class="small" for="search-input">Link do YouTube ou nome da música</label>
-    <div class="row">
-      <input type="text" id="search-input" placeholder="Artista ou música..." autocomplete="off">
-      <button class="btn" type="submit">Buscar</button>
-    </div>
-    <div class="results" id="results"></div>
+<!-- Primeira vez: como a galera te chama -->
+<div class="onboard" id="onboard" hidden>
+  <img src="/static/disco.svg" width="110" height="121" alt="">
+  <div class="display" style="font-size:34px;color:var(--gold);line-height:1">PALCO</div>
+  <form id="name-form" class="onboard-form">
+    <label for="name-input" class="display" style="font-size:20px">COMO A GALERA TE CHAMA?</label>
+    <input type="text" id="name-input" maxlength="24" autocomplete="nickname" placeholder="Seu nome ou apelido" required>
+    <button class="btn big" type="submit">ENTRAR NA FESTA</button>
+    <p class="sub" style="margin:0;text-align:center">O nome aparece no telão quando for a sua vez.</p>
   </form>
-
-  <div id="queue-section" hidden>
-    <div class="section-head"><h2>Na fila</h2></div>
-    <div id="queue"></div>
-  </div>
-
-  <div class="section-head">
-    <h2>Prontas para cantar</h2>
-    <input type="search" id="lib-filter" placeholder="Pesquisar...">
-  </div>
-  <div id="library"></div>
 </div>
-<script src="/static/common.js?v=2"></script>
-<script>
-  // Página do celular: adiciona músicas, acompanha a fila e apaga só as próprias.
-  const $ = (id) => document.getElementById(id);
-  let SONGS = [];
-  const mine = (s) => s.owner === CLIENT;
 
-  setupSearch($("search-form"), $("search-input"), $("results"));
-  $("lib-filter").addEventListener("input", renderLibrary);
+<main class="m-wrap" id="app">
+  <header class="m-top">
+    <span class="display" style="font-size:22px;color:var(--gold)">PALCO</span>
+    <button class="me-chip" id="me-chip" aria-label="Trocar meu nome"></button>
+  </header>
 
-  watchState((s) => {
-    SONGS = s.songs;
-    const pending = SONGS.filter((x) => x.status !== "ready");
-    $("queue-section").hidden = !pending.length;
-    renderQueue($("queue"), pending, mine, async (song) => {
-      try { await api(`/api/songs/${song.id}/retry`, { method: "POST" }); } catch (e) { toast(e.message, true); }
-    });
-    renderLibrary();
-  });
+  <!-- Quem está cantando agora + voto -->
+  <section class="now card" id="now" hidden aria-live="polite"></section>
 
-  function renderLibrary() {
-    const q = $("lib-filter").value.trim().toLowerCase();
-    const box = $("library");
-    const songs = SONGS.filter((s) => s.status === "ready" && (!q || `${s.artist} ${s.title}`.toLowerCase().includes(q))).reverse();
-    box.replaceChildren();
-    if (!songs.length) { box.append(h("p", { class: "empty" }, "Nenhuma música pronta ainda.")); return; }
-    for (const s of songs) {
-      const item = h("div", { class: "lib-item" },
-        h("div", { class: "body", style: "cursor:default" },
-          h("img", { src: s.cover, alt: "" }),
-          h("div", { class: "meta" },
-            h("div", { class: "title" }, s.title),
-            h("div", { class: "badges" }, h("span", { class: "sub" }, s.artist), mine(s) ? h("span", { class: "badge mine" }, "sua") : null))));
-      if (mine(s)) item.append(h("button", { class: "act", title: "Apagar", onclick: async () => {
-        if (!confirm(`Apagar "${s.title}"?`)) return;
-        try { await api(`/api/songs/${s.id}`, { method: "DELETE" }); } catch (e) { toast(e.message, true); }
-      } }, "🗑️"));
-      box.append(item);
-    }
-  }
-</script>
+  <!-- Pedir -->
+  <section class="tab" id="tab-pedir">
+    <div class="my-turn" id="my-turn" hidden></div>
+    <form id="search-form" class="m-search">
+      <label for="search-input" class="display" style="font-size:16px;letter-spacing:1px">PEDE A SUA</label>
+      <div class="row">
+        <input type="text" id="search-input" placeholder="Música, artista ou link" autocomplete="off">
+        <button class="icon-btn" type="submit" aria-label="Buscar" style="background:var(--gold);color:var(--gold-ink);border:0"><i data-icon="search"></i></button>
+      </div>
+      <div class="seg" role="group" aria-label="Tipo de versão" style="align-self:flex-start">
+        <button type="button" data-kind="original" class="on" aria-pressed="true">Original</button>
+        <button type="button" data-kind="karaoke" aria-pressed="false">Já é karaokê</button>
+      </div>
+    </form>
+    <div class="results" id="results"></div>
+    <div class="section-head" style="margin:22px 0 10px">
+      <h2 class="h-section" style="font-size:16px">JÁ PRONTAS PRA CANTAR</h2>
+      <input type="search" class="lib-filter" id="lib-filter" placeholder="Procurar" aria-label="Procurar no repertório" style="min-width:0;width:140px">
+    </div>
+    <ul class="queue-list" id="library"></ul>
+  </section>
+
+  <!-- Fila -->
+  <section class="tab" id="tab-fila" hidden>
+    <h2 class="h-section" style="font-size:18px;margin-bottom:12px">FILA DA FESTA</h2>
+    <ol class="queue-list" id="queue"></ol>
+  </section>
+
+  <!-- Efeitos -->
+  <section class="tab" id="tab-efeitos" hidden>
+    <div style="margin-bottom:14px">
+      <div class="display" style="font-size:24px;line-height:1;color:var(--gold)">MESA DO ANIMADOR</div>
+      <div class="sub">Toca no telão na hora. Sem exagero, hein!</div>
+    </div>
+    <div class="pads" id="pads"></div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Seções">
+  <button data-tab="pedir" class="on" aria-current="page"><i data-icon="mic" data-size="22"></i>Pedir</button>
+  <button data-tab="fila"><i data-icon="list" data-size="22"></i><span>Fila <b id="queue-count"></b></span></button>
+  <button data-tab="efeitos"><i data-icon="pads" data-size="22"></i>Efeitos</button>
+</nav>
+
+<script src="/static/common.js?v=3"></script>
+<script src="/static/mobile.js?v=3"></script>
 </body>
 </html>

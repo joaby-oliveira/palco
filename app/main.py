@@ -12,7 +12,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, metadata, providers, store, usage, worker, youtube
+from . import config, metadata, party, providers, store, usage, worker, youtube
 
 STATIC = config.ROOT / "static"
 STEMS = {"original", "instrumental", "lead", "backing"}
@@ -33,6 +33,7 @@ async def no_cache_pages(request: Request, call_next):
 def _startup():
     config.load()
     store.load()
+    party.load()
     worker.start()
 
 
@@ -59,13 +60,15 @@ def client_id(request) -> str:
     return request.headers.get("x-client") or request.query_params.get("client") or "anon"
 
 
-def state(host: bool) -> dict:
+def state(host: bool, client: str = "") -> dict:
     return {
         "songs": store.snapshot(),
         "config": config.public() if host else {"provider": config.get("provider")},
         "providers": providers.listing() if host else [],
         "session_url": session_url(),
         "is_host": host,
+        "party": party.snapshot(client),
+        "fx": {"names": party.FX, "files": party.fx_files()},
     }
 
 
@@ -97,22 +100,32 @@ def player(song_id: str):
 
 @app.get("/api/state")
 def get_state(request: Request):
-    return state(is_host(request))
+    return state(is_host(request), client_id(request))
 
 
 @app.websocket("/ws")
 async def ws(socket_: WebSocket):
     await socket_.accept()
     host = socket_.client.host in ("127.0.0.1", "::1")
-    seen = -1
+    client = socket_.query_params.get("client") or "anon"
+    # Quem conta como "na festa" são os celulares; o notebook não entra na conta
+    if not host:
+        party.connected(client, 1)
+    seen, fx_seen = -1, party.fx_event["seq"]
     try:
         while True:
             if store.version != seen:
                 seen = store.version
-                await socket_.send_json(state(host))
-            await asyncio.sleep(0.4)
+                await socket_.send_json(state(host, client))
+            if party.fx_event["seq"] != fx_seen:
+                fx_seen = party.fx_event["seq"]
+                await socket_.send_json({"fx_event": party.fx_event})
+            await asyncio.sleep(0.1)
     except (WebSocketDisconnect, RuntimeError):
         pass
+    finally:
+        if not host:
+            party.connected(client, -1)
 
 
 @app.get("/api/qr.svg")
@@ -154,7 +167,11 @@ def add_song(request: Request, video: dict = Body(...)):
     # Com/sem backing vocals: escolhido na hora de adicionar; sem escolha, vale o padrão do ⚙
     backing = video.get("backing")
     want_backing = None if backing is None or kind == "karaoke" else bool(backing)
-    return store.add(video, artist, title, client_id(request), kind, want_backing)
+    song = store.add(video, artist, title, client_id(request), kind, want_backing)
+    # Pedido de música: já entra na fila da festa com o nome de quem pediu
+    if video.get("queue"):
+        party.enqueue(song["id"], client_id(request), is_host(request))
+    return song
 
 
 @app.delete("/api/songs/{song_id}")
@@ -167,6 +184,7 @@ def delete_song(song_id: str, request: Request):
         store.update(song_id, step="Cancelando...")
     else:
         store.remove(song_id)
+    party.drop_song(song_id)
     return {"ok": True}
 
 
@@ -202,6 +220,87 @@ def patch_song(song_id: str, request: Request, fields: dict = Body(...)):
     allowed = {k: v for k, v in fields.items() if k in ("offset", "key", "title", "artist")}
     store.update(song_id, **allowed)
     return store.get(song_id)
+
+
+# ---------- Festa: convidados, fila do palco, votos e efeitos ----------
+
+@app.post("/api/me")
+def set_me(request: Request, body: dict = Body(...)):
+    try:
+        return party.set_guest(client_id(request), str(body.get("name", "")))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/stage")
+def stage_add(request: Request, body: dict = Body(...)):
+    """Entra na fila para cantar uma música da biblioteca."""
+    _song_or_404(str(body.get("song_id")))
+    return party.enqueue(body["song_id"], client_id(request), is_host(request))
+
+
+@app.delete("/api/stage/{entry_id}")
+def stage_remove(entry_id: str, request: Request):
+    try:
+        party.remove(entry_id, client_id(request), is_host(request))
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/stage/{entry_id}/later")
+def stage_later(entry_id: str, request: Request):
+    if not is_host(request):
+        raise HTTPException(403)
+    party.to_end(entry_id)
+    return {"ok": True}
+
+
+@app.post("/api/stage/start")
+def stage_start(request: Request, body: dict = Body(...)):
+    """Põe no palco um pedido da fila (entry_id) ou uma música direto (song_id)."""
+    if not is_host(request):
+        raise HTTPException(403)
+    if body.get("song_id"):
+        _song_or_404(str(body["song_id"]))
+    try:
+        return party.start(body.get("entry_id"), body.get("song_id"), body.get("client") or client_id(request), True)
+    except KeyError as e:
+        raise HTTPException(404, str(e.args[0]))
+
+
+@app.post("/api/stage/{entry_id}/finish")
+def stage_finish(entry_id: str, request: Request):
+    if not is_host(request):
+        raise HTTPException(403)
+    party.finish(entry_id)
+    return {"ok": True}
+
+
+@app.post("/api/vote")
+def vote(request: Request, body: dict = Body(...)):
+    try:
+        party.vote(client_id(request), int(body.get("score", 0)))
+    except (LookupError, PermissionError) as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/fx/{name}")
+def fx(name: str, request: Request):
+    try:
+        party.fx(name, client_id(request))
+    except KeyError as e:
+        raise HTTPException(404, str(e.args[0]))
+    return {"ok": True}
+
+
+@app.get("/media/fx/{name}")
+def fx_file(name: str):
+    f = party.fx_files().get(Path(name).stem)
+    if not f or f != name:
+        raise HTTPException(404)
+    return FileResponse(config.DATA_DIR / "fx" / f)
 
 
 # ---------- Letra e capa ----------

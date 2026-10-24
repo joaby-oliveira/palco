@@ -3,72 +3,127 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Karaoke Player</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
-<link rel="stylesheet" href="/static/style.css?v=2">
-<link rel="stylesheet" href="/static/player.css?v=2">
+<title>Palco</title>
+<link rel="icon" href="/static/disco.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/player.css?v=3">
 </head>
 <body>
 <div id="stage">
-  <div class="player-head">
-    <a class="back" href="/">← voltar</a>
-    <h1 id="song-title"></h1>
+  <div id="lyrics-bg" aria-hidden="true"></div>
+  <div class="tint" aria-hidden="true"></div>
+  <div class="beams stage-beams" aria-hidden="true"><span></span><span></span><span></span></div>
+  <img class="disco" src="/static/disco.svg" alt="" aria-hidden="true">
+
+  <div class="singer" id="singer-box" hidden>
+    <span class="label">NO MICROFONE</span>
+    <span class="who" id="singer-who"></span>
+    <span class="song" id="song-title"></span>
+  </div>
+  <div class="singer" id="song-only" hidden>
+    <span class="label">TOCANDO</span>
+    <span class="song big" id="song-title-2"></span>
+  </div>
+
+  <div class="up-next" id="up-next">
+    <span class="txt"><span class="k" id="up-next-k">Pede a sua</span><span class="v" id="up-next-v">Escaneia o QR</span></span>
+    <span class="qr"><img src="/api/qr.svg" alt="QR code para pedir música"></span>
   </div>
 
   <div id="lyrics-box">
-    <div id="lyrics-bg"></div>
     <div id="lyrics-scroll"><div id="lyrics-lines"></div></div>
-    <div id="loading">Carregando faixas...</div>
+    <div id="loading">Carregando as faixas…</div>
   </div>
+  <div class="countdown" id="countdown" hidden aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <nav class="fx-rail" id="fx-rail" aria-label="Efeitos sonoros"></nav>
 
   <div id="controls">
-    <div class="ctl-row">
-      <span class="pill" id="mix-info" hidden></span>
-      <div class="seg" data-separated>
-        <button id="mode-original">Original</button>
-        <button id="mode-instrumental" class="on">Instrumental</button>
+    <div class="drawer" id="sync-drawer" hidden>
+      <div class="drawer-head"><b>Acertar a letra</b><button class="icon-btn sm" data-drawer-close aria-label="Fechar"><i data-icon="x" data-size="16"></i></button></div>
+      <div class="rec-bar" id="rec-bar" hidden>
+        <span class="rec-dot"></span>
+        <span id="rec-hint">Aperta <b>espaço</b> no começo de cada linha</span>
+        <button id="rec-mark" class="btn sm">Marcar linha (espaço)</button>
+        <button id="rec-undo" class="btn sm ghost" title="Backspace">Desfazer</button>
+        <button id="rec-done" class="btn sm ghost" title="Esc">Concluir e salvar</button>
+        <button id="rec-cancel" class="btn sm ghost">Cancelar</button>
       </div>
-      <label class="pill" id="backing-pill" data-separated>Vocais de suporte <input type="range" id="vol-backing" min="0" max="1" step="0.01" value="1"></label>
-      <label class="pill" data-separated>Vocais originais <input type="range" id="vol-lead" min="0" max="1" step="0.01" value="0"></label>
-      <label class="pill">Nota <select id="key-note"></select></label>
-      <label class="pill">Escala <select id="key-scale"><option>Major</option><option>Minor</option></select></label>
-    </div>
-    <div class="ctl-row">
-      <label class="pill">Desfoque do fundo <input type="range" id="blur" min="0" max="40" step="1" value="18"></label>
-      <label class="pill">Brilho do texto <input type="range" id="bright" min="0.15" max="1" step="0.01" value="0.75"></label>
-    </div>
-
-    <div class="transport">
-      <button id="play" class="round" title="Tocar / pausar (espaço)">▶</button>
-      <span id="time">0:00 / 0:00</span>
-      <input type="range" id="seek" min="0" max="1000" step="1" value="0">
-      <span class="vol">🔊 <input type="range" id="master" min="0" max="1" step="0.01" value="1"></span>
+      <div class="sync">
+        <button id="rec-start" class="btn sm pink" title="Toque a música e marque o começo de cada linha em tempo real">● Gravar sincronia</button>
+        <button id="sync-mouse" class="btn sm ghost" title="Ative e clique na linha da letra no momento em que ela começa">Clicar na linha certa</button>
+        <span class="shift">
+          <button class="btn sm ghost" data-shift="-0.5">-0.5s</button>
+          <button class="btn sm ghost" data-shift="-0.1">-0.1s</button>
+          <span id="offset">0.0s</span>
+          <button class="btn sm ghost" data-shift="0.1">+0.1s</button>
+          <button class="btn sm ghost" data-shift="0.5">+0.5s</button>
+        </span>
+      </div>
+      <p class="hint" style="margin:8px 0 0">Letra atrasada: aperte <b>+</b>. Adiantada: <b>−</b>. Para uma versão karaokê com outro tempo, use Gravar sincronia: marcar só a primeira linha já empurra o resto.</p>
     </div>
 
-    <div class="rec-bar" id="rec-bar" hidden>
-      <span class="rec-dot"></span>
-      <span id="rec-hint">Aperte <b>espaço</b> no começo de cada linha</span>
-      <button id="rec-mark" class="btn sm">Marcar linha (espaço)</button>
-      <button id="rec-undo" class="btn sm ghost" title="Backspace">Desfazer</button>
-      <button id="rec-done" class="btn sm ghost" title="Esc">Concluir e salvar</button>
-      <button id="rec-cancel" class="btn sm ghost">Cancelar</button>
+    <div class="drawer" id="adjust-drawer" hidden>
+      <div class="drawer-head"><b>Ajustes</b><button class="icon-btn sm" data-drawer-close aria-label="Fechar"><i data-icon="x" data-size="16"></i></button></div>
+      <div class="adjust-grid">
+        <label class="slider" id="backing-pill" data-separated><span>Backing vocals</span><input type="range" id="vol-backing" min="0" max="1" step="0.01" value="1"></label>
+        <label class="slider" data-separated><span>Voz original</span><input type="range" id="vol-lead" min="0" max="1" step="0.01" value="0"></label>
+        <label class="slider"><span>Volume da música</span><input type="range" id="master" min="0" max="1" step="0.01" value="1"></label>
+        <label class="slider"><span>Efeitos sonoros</span><input type="range" id="fx-vol" min="0" max="1" step="0.05" value="0.7"></label>
+        <label class="slider"><span>Desfoque do fundo</span><input type="range" id="blur" min="0" max="40" step="1" value="24"></label>
+        <label class="slider"><span>Letra das outras linhas</span><input type="range" id="bright" min="0.15" max="1" step="0.01" value="0.6"></label>
+        <label class="slider"><span>Tom (para referência)</span><span class="inline"><select id="key-note" aria-label="Nota"></select><select id="key-scale" aria-label="Escala"><option value="Major">maior</option><option value="Minor">menor</option></select></span></label>
+        <label class="slider" title="Atraso da caixa Bluetooth: a letra espera esse tempo"><span>Atraso do Bluetooth (s)</span><input type="number" id="bt" step="0.05" min="0" max="2"></label>
+      </div>
     </div>
 
-    <div class="sync">
-      <button id="rec-start" title="Toque a música e marque o começo de cada linha em tempo real">● Gravar sincronia</button>
-      <button id="sync-mouse" title="Ative e clique na linha da letra no momento em que ela começa">Sync com mouse</button>
-      <button data-shift="-0.5">-0.5s</button>
-      <button data-shift="-0.1">-0.1s</button>
-      <span id="offset">0.0s</span>
-      <button data-shift="0.1">+0.1s</button>
-      <button data-shift="0.5">+0.5s</button>
+    <div class="progress">
+      <span id="time-now">0:00</span>
+      <input type="range" id="seek" min="0" max="1000" step="1" value="0" aria-label="Posição na música">
+      <span id="time-total">0:00</span>
+    </div>
+    <div class="bar-row">
+      <button id="play" class="icon-btn round play" title="Tocar / pausar (espaço)" aria-label="Tocar ou pausar"><i data-icon="play" data-size="22"></i></button>
+      <button id="finish" class="icon-btn round" title="Encerrar e chamar o próximo" aria-label="Encerrar e chamar o próximo"><i data-icon="next" data-size="20"></i></button>
       <span class="sep"></span>
-      <label title="Atraso da caixa Bluetooth: a letra espera esse tempo">BT <input type="number" id="bt" step="0.05" min="0" max="2"> s</label>
-      <button id="fullscreen" title="Tela cheia (F)">⛶</button>
+      <div class="seg voice" id="voice" role="group" aria-label="Voz original" data-separated>
+        <button data-voice="full" aria-pressed="false">Com voz</button>
+        <button data-voice="guide" aria-pressed="false">Voz guia</button>
+        <button data-voice="none" aria-pressed="true" class="on">Sem voz</button>
+      </div>
+      <span class="pill" id="mix-info" hidden></span>
+      <span class="grow"></span>
+      <button class="btn ghost" id="open-sync"><i data-icon="clock" data-size="18"></i>Letra fora do tempo?</button>
+      <button class="icon-btn round" id="open-adjust" title="Ajustes" aria-label="Ajustes"><i data-icon="sliders" data-size="20"></i></button>
+      <button class="icon-btn round" id="fullscreen" title="Tela cheia (F)" aria-label="Tela cheia"><i data-icon="expand" data-size="20"></i></button>
+      <a class="icon-btn round" href="/" title="Voltar ao início" aria-label="Voltar ao início"><i data-icon="x" data-size="20"></i></a>
+    </div>
+  </div>
+
+  <!-- Fim da música -->
+  <div class="final" id="final" hidden>
+    <div class="rays" aria-hidden="true"></div>
+    <div class="confetti" id="confetti" aria-hidden="true"></div>
+    <div class="final-body">
+      <span class="kicker">E A PLATEIA DIZ…</span>
+      <h1 id="final-title"></h1>
+      <span class="final-song" id="final-song"></span>
+      <div class="thermo">
+        <div class="thermo-head"><span>Termômetro da galera</span><span id="final-votes"></span></div>
+        <div class="thermo-bar"><div id="final-fill"><span id="final-score"></span></div></div>
+        <div class="thermo-foot"><span>Desafinou feio</span><span>Pede bis!</span></div>
+      </div>
+    </div>
+    <div class="final-actions">
+      <button class="btn ghost big-ghost" id="final-bis">Bis!</button>
+      <button class="btn big" id="final-next"></button>
     </div>
   </div>
 </div>
-<script src="/static/common.js?v=2"></script>
-<script src="/static/player.js?v=2"></script>
+<script src="/static/common.js?v=3"></script>
+<script src="/static/fx.js?v=3"></script>
+<script src="/static/player.js?v=3"></script>
 </body>
 </html>
