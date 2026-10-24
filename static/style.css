@@ -304,3 +304,6 @@ dialog::backdrop { background: rgba(8,4,14,.75); backdrop-filter: blur(4px); }
 }
 
 [hidden] { display: none !important; }
+
+/* Servidor desatualizado (código novo, servidor antigo) */
+.restart-banner { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 70; max-width: calc(100vw - 32px); background: var(--gold); color: var(--gold-ink); padding: 12px 20px; border-radius: 16px; font-weight: 600; box-shadow: 0 10px 40px rgba(0,0,0,.5); }

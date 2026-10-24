@@ -1,6 +1,7 @@
 """Servidor do karaokê. Rode com:  .venv\\Scripts\\python -m app"""
 import asyncio
 import io
+import json
 import socket
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, metadata, party, providers, store, usage, worker, youtube
+from . import camlink, config, dance, metadata, party, providers, store, usage, worker, youtube
 
 STATIC = config.ROOT / "static"
 STEMS = {"original", "instrumental", "lead", "backing"}
@@ -20,11 +21,22 @@ STEMS = {"original", "instrumental", "lead", "backing"}
 app = FastAPI(title="Karaoke")
 
 
+def code_version() -> float:
+    """Última mudança no código do servidor. As páginas sempre vêm atualizadas,
+    mas o servidor só pega código novo quando o iniciar.bat é aberto de novo."""
+    files = [*(config.ROOT / "app").glob("*.py"), *(config.ROOT / "app" / "providers").glob("*.py")]
+    return max(f.stat().st_mtime for f in files)
+
+
+CODE_AT_START = code_version()
+
+
 @app.middleware("http")
 async def no_cache_pages(request: Request, call_next):
     # O navegador sempre confere se as páginas e scripts mudaram (senão roda código velho depois de uma atualização)
     response = await call_next(request)
-    if request.url.path.startswith("/static") or request.url.path in ("/", "/m") or request.url.path.startswith("/play/"):
+    path = request.url.path
+    if path.startswith(("/static", "/play/", "/review/")) or path in ("/", "/m", "/cam"):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -52,6 +64,11 @@ def session_url() -> str:
     return f"http://{lan_ip()}:{config.get('port')}/m"
 
 
+def cam_url() -> str:
+    """Página da câmera do celular (modo dança). Precisa ser HTTPS para o celular liberar a câmera."""
+    return f"https://{lan_ip()}:{config.get('https_port')}/cam"
+
+
 def is_host(request) -> bool:
     return request.client.host in ("127.0.0.1", "::1", "localhost")
 
@@ -67,6 +84,8 @@ def state(host: bool, client: str = "") -> dict:
         "providers": providers.listing() if host else [],
         "session_url": session_url(),
         "is_host": host,
+        # Código mudou depois que o servidor abriu: o telão pede para reiniciar
+        "needs_restart": host and code_version() > CODE_AT_START,
         "party": party.snapshot(client),
         "fx": {"sounds": party.sounds(), "favorites": party.favorites()},
     }
@@ -91,9 +110,21 @@ def mobile():
     return FileResponse(STATIC / "mobile.html")
 
 
+@app.get("/review/{song_id}")
+def review(song_id: str):
+    return FileResponse(STATIC / "review.html")
+
+
+@app.get("/cam")
+def phone_cam():
+    return FileResponse(STATIC / "cam.html")
+
+
 @app.get("/play/{song_id}")
 def player(song_id: str):
-    return FileResponse(STATIC / "player.html")
+    # Música do modo dança abre o palco de dança (a fila da festa usa o mesmo link)
+    song = store.get(song_id)
+    return FileResponse(STATIC / ("dance.html" if song and song.get("kind") == "dance" else "player.html"))
 
 
 # ---------- Estado em tempo real ----------
@@ -128,9 +159,48 @@ async def ws(socket_: WebSocket):
             party.connected(client, -1)
 
 
+# ---------- Celular como câmera do modo dança ----------
+
+@app.websocket("/ws/cam")
+async def cam_socket(socket_: WebSocket):
+    """Celular mandando os pontos do corpo de quem dança."""
+    await socket_.accept()
+    cam_id = (socket_.query_params.get("id") or "celular")[:20]
+    camlink.cams.add(socket_)
+    await socket_.send_text(json.dumps({"type": "stages", "n": len(camlink.stages)}))
+    await camlink.cam_status(cam_id, True)
+    try:
+        while True:
+            await camlink.to_stages(await socket_.receive_text())
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        camlink.cams.discard(socket_)
+        await camlink.cam_status(cam_id, False)
+
+
+@app.websocket("/ws/stage-cam")
+async def stage_cam_socket(socket_: WebSocket):
+    """Palco de dança (só no notebook) recebendo os pontos dos celulares."""
+    if socket_.client.host not in ("127.0.0.1", "::1"):
+        await socket_.close()
+        return
+    await socket_.accept()
+    camlink.stages.add(socket_)
+    await camlink.stage_count()
+    try:
+        while True:
+            await socket_.receive_text()
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        camlink.stages.discard(socket_)
+        await camlink.stage_count()
+
+
 @app.get("/api/qr.svg")
-def qr():
-    img = qrcode.make(session_url(), image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2)
+def qr(target: str = ""):
+    img = qrcode.make(cam_url() if target == "cam" else session_url(), image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2)
     buf = io.BytesIO()
     img.save(buf)
     return Response(buf.getvalue(), media_type="image/svg+xml")
@@ -160,13 +230,14 @@ async def preview(video_id: str):
 
 @app.post("/api/songs")
 def add_song(request: Request, video: dict = Body(...)):
-    artist, title = youtube.guess_artist_title(video.get("title", ""), video.get("channel", ""))
     kind = video.get("kind") or ("karaoke" if youtube.is_karaoke(video.get("title", "")) else "original")
-    if kind not in ("original", "karaoke"):
+    if kind not in ("original", "karaoke", "dance"):
         kind = "original"
+    guess = youtube.guess_dance_title if kind == "dance" else youtube.guess_artist_title
+    artist, title = guess(video.get("title", ""), video.get("channel", ""))
     # Com/sem backing vocals: escolhido na hora de adicionar; sem escolha, vale o padrão do ⚙
     backing = video.get("backing")
-    want_backing = None if backing is None or kind == "karaoke" else bool(backing)
+    want_backing = None if backing is None or kind != "original" else bool(backing)
     song = store.add(video, artist, title, client_id(request), kind, want_backing)
     # Pedido de música: já entra na fila da festa com o nome de quem pediu
     if video.get("queue"):
@@ -387,6 +458,54 @@ def set_cover(song_id: str, body: dict = Body(...)):
 
 
 # ---------- Áudio ----------
+
+@app.get("/media/{song_id}/video.mp4")
+def dance_video(song_id: str):
+    f = store.song_dir(song_id) / "video.mp4"
+    if not f.exists():
+        raise HTTPException(404)
+    return FileResponse(f, media_type="video/mp4")
+
+
+@app.post("/api/songs/{song_id}/dance-sessions")
+def save_dance_session(song_id: str, request: Request, body: dict = Body(...)):
+    """Guarda uma dança (pontos de cada quadro e notas) para a tela de análise."""
+    _song_or_404(song_id)
+    if not is_host(request):
+        raise HTTPException(403)
+    return dance.save_session(song_id, body)
+
+
+@app.get("/api/songs/{song_id}/dance-sessions")
+def dance_sessions(song_id: str):
+    _song_or_404(song_id)
+    return dance.list_sessions(song_id)
+
+
+@app.get("/api/songs/{song_id}/dance-sessions/{session_id}")
+def dance_session(song_id: str, session_id: str):
+    f = dance.session_file(song_id, session_id)
+    if not f:
+        raise HTTPException(404, "Análise não encontrada")
+    return FileResponse(f, media_type="application/json")
+
+
+@app.delete("/api/songs/{song_id}/dance-sessions/{session_id}")
+def delete_dance_session(song_id: str, session_id: str, request: Request):
+    if not is_host(request):
+        raise HTTPException(403)
+    dance.delete_session(song_id, session_id)
+    return {"ok": True}
+
+
+@app.get("/media/{song_id}/pose.json")
+def dance_pose(song_id: str):
+    """Gabarito do modo dança: pose do coach quadro a quadro e os movimentos."""
+    f = store.song_dir(song_id) / "pose.json"
+    if not f.exists():
+        raise HTTPException(404)
+    return FileResponse(f, media_type="application/json")
+
 
 @app.get("/media/{song_id}/{stem}.mp3")
 def media(song_id: str, stem: str):

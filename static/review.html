@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Análise da dança · Palco</title>
+<link rel="icon" href="/static/disco.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/review.css?v=1">
+</head>
+<body>
+<div class="wrap review">
+  <header class="rv-top">
+    <a class="icon-btn round" href="/" title="Voltar ao início" aria-label="Voltar ao início"><i data-icon="back" data-size="20"></i></a>
+    <div class="rv-title">
+      <span class="kicker">ANÁLISE DA DANÇA</span>
+      <h1 id="song-title">Carregando…</h1>
+    </div>
+    <label class="rv-session"><span class="sub">Dança</span><select id="session"></select></label>
+    <a class="btn ghost sm" id="download" download>Baixar dados</a>
+    <button class="btn danger sm" id="delete">Apagar</button>
+    <a class="btn sm" id="dance-again"><i data-icon="dance" data-size="16"></i>Dançar de novo</a>
+  </header>
+
+  <p class="empty" id="empty" hidden>Essa música ainda não tem nenhuma dança gravada. Dance com nota e volte aqui.</p>
+
+  <div id="content" hidden>
+    <!-- Resumo -->
+    <section class="rv-cards" id="cards" aria-label="Resumo"></section>
+
+    <!-- Comparação quadro a quadro -->
+    <section class="card rv-compare" aria-labelledby="cmp-title">
+      <div class="section-head" style="margin:0">
+        <h2 class="h-section" id="cmp-title">COACH × VOCÊ</h2>
+        <div class="rv-opts">
+          <label class="seg-label"><span class="sub">Jogador</span><select id="player"></select></label>
+          <label class="check"><input type="checkbox" id="compensate" checked> Comparar com o quadro do coach que a nota usou</label>
+        </div>
+      </div>
+      <div class="cmp-grid">
+        <div class="coach-view" id="coach-view">
+          <video id="video" playsinline preload="auto"></video>
+          <canvas id="coach-canvas"></canvas>
+        </div>
+        <div class="overlay-view">
+          <canvas id="overlay"></canvas>
+          <div class="legend"><span class="coach">Coach</span><span class="you">Você</span><span id="frame-info"></span></div>
+        </div>
+        <div class="bones" id="bones" aria-live="off"></div>
+      </div>
+      <div class="rv-player">
+        <button class="icon-btn round" id="play" aria-label="Tocar ou pausar (espaço)"><i data-icon="play" data-size="20"></i></button>
+        <span id="time" class="time">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Posição">
+        <select id="speed" aria-label="Velocidade">
+          <option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option>
+        </select>
+        <button class="btn ghost sm" id="prev-miss" title="Movimento anterior com nota baixa">‹ Nota baixa</button>
+        <button class="btn ghost sm" id="next-miss" title="Próximo movimento com nota baixa">Nota baixa ›</button>
+      </div>
+    </section>
+
+    <!-- Linha do tempo -->
+    <section class="card" aria-labelledby="tl-title">
+      <div class="section-head" style="margin:0 0 10px">
+        <h2 class="h-section" id="tl-title">NOTA DE CADA MOVIMENTO</h2>
+        <span class="sub">Barras: nota recalculada com os valores ao lado · faixa de cima: nota que saiu na hora · pontinhos: cada quadro da câmera</span>
+      </div>
+      <canvas id="timeline" class="timeline"></canvas>
+      <div class="move-detail" id="move-detail">Clique num movimento para ver os detalhes.</div>
+    </section>
+
+    <div class="rv-bottom">
+      <!-- Atraso -->
+      <section class="card" aria-labelledby="lag-title">
+        <h2 class="h-section" id="lag-title">ATRASO DE QUEM DANÇA</h2>
+        <p class="sub" style="margin:4px 0 10px">Em quanto tempo antes estava o quadro do coach que mais combinou com cada quadro da câmera (medido numa janela bem larga, de −1,2 s a +0,4 s). A faixa clara é a janela que a nota usa hoje.</p>
+        <canvas id="lag" class="lag"></canvas>
+        <p class="lag-note" id="lag-note"></p>
+      </section>
+
+      <!-- Calibragem -->
+      <section class="card" aria-labelledby="cal-title">
+        <h2 class="h-section" id="cal-title">CALIBRAGEM</h2>
+        <p class="sub" style="margin:4px 0 12px">Mexa nos valores: a dança gravada é recalculada na hora. Quando ficar justo, use nas próximas danças.</p>
+        <div class="cal-grid" id="cal"></div>
+        <div class="cal-result" id="cal-result"></div>
+        <div class="cal-actions">
+          <button class="btn ghost sm" id="cal-session">Valores desta dança</button>
+          <button class="btn ghost sm" id="cal-default">Padrões de fábrica</button>
+          <button class="btn sm" id="cal-save">Usar nas próximas danças</button>
+        </div>
+        <p class="sub" id="cal-status" style="margin:10px 0 0"></p>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="/static/common.js?v=3"></script>
+<script type="module" src="/static/review.js?v=1"></script>
+</body>
+</html>

@@ -47,7 +47,9 @@ def song_dir(song_id: str):
 def add(video: dict, artist: str, title: str, owner: str, kind: str = "original", want_backing: bool | None = None) -> dict:
     with _lock:
         for s in _songs.values():
-            if s["video_id"] == video["id"] and s["status"] in ("queued", "processing", "ready"):
+            # O mesmo vídeo pode estar no repertório para cantar e para dançar
+            same_mode = (s.get("kind") == "dance") == (kind == "dance")
+            if s["video_id"] == video["id"] and same_mode and s["status"] in ("queued", "processing", "ready"):
                 return s
         song = {
             "id": uuid.uuid4().hex[:10],
@@ -59,7 +61,7 @@ def add(video: dict, artist: str, title: str, owner: str, kind: str = "original"
             "thumbnail": video.get("thumbnail", ""),
             "cover": video.get("thumbnail", ""),
             "owner": owner,
-            "kind": kind,            # original | karaoke (vídeo que já é instrumental)
+            "kind": kind,            # original | karaoke (vídeo que já é instrumental) | dance (vídeo de coreografia)
             "separated": False,      # True quando a voz foi separada
             "want_backing": want_backing,  # separar backing vocals? None = padrão do ⚙
             "warning": None,

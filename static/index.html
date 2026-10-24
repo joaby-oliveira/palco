@@ -26,6 +26,7 @@
       <div class="seg" role="group" aria-label="Tipo de versão">
         <button type="button" data-kind="original" class="on" aria-pressed="true">Original</button>
         <button type="button" data-kind="karaoke" aria-pressed="false" title="Vídeos que já são instrumentais: não gastam separação">Já é karaokê</button>
+        <button type="button" data-kind="dance" aria-pressed="false" title="Vídeo de coreografia: a webcam dá a nota de quem dança">Dança</button>
       </div>
       <button class="btn pink" type="submit">Buscar</button>
     </form>
@@ -95,11 +96,11 @@
           <span class="name">DUELO</span>
           <span class="desc">Em breve · dois cantores, a galera vota</span>
         </div>
-        <div class="mode soon">
+        <button type="button" class="mode" id="open-dance">
           <i data-icon="dance" data-size="34"></i>
           <span class="name">DANÇA</span>
-          <span class="desc">Em breve · com câmera ou Kinect</span>
-        </div>
+          <span class="desc">Imita o coach na frente da webcam e ganha nota</span>
+        </button>
       </div>
     </section>
 

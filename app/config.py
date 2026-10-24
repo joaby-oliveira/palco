@@ -44,6 +44,10 @@ DEFAULTS = {
     # Volume dos efeitos sonoros (0 a 1)
     "fx_volume": 0.7,
     "port": 8000,
+    # Parâmetros da nota da dança calibrados na tela de análise (vazio = padrões do dance-score.js)
+    "dance_params": {},
+    # Porta HTTPS: o celular só libera a câmera em página segura (modo dança)
+    "https_port": 8443,
 }
 
 SECRET_KEYS = {"mvsep_api_token", "musicai_api_key", "replicate_api_token"}

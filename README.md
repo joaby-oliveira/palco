@@ -102,11 +102,70 @@ Para adicionar outro serviço, crie um arquivo em `app/providers/` seguindo o
 - Espaço toca/pausa, setas pulam 5 s, F é tela cheia. Os controles somem
   sozinhos enquanto a música toca.
 
+## Modo dança
+
+Um "Just Dance" caseiro: o vídeo da coreografia toca na tela e a webcam do
+notebook dá nota para quem imita o coach.
+
+1. Na busca, escolha **Dança** (ou clique no cartão **DANÇA**). O app procura
+   vídeos de "just dance" da música; também dá para colar o link de qualquer
+   vídeo de coreografia com o dançarino de corpo inteiro.
+2. No preparo, o app baixa o vídeo (até 720p) e marca a pose do coach quadro a
+   quadro com o MediaPipe (~1,5 min para uma música de 4 min). Não gasta
+   separação de voz: a música toca inteira.
+3. No palco, fique na frente da câmera de corpo inteiro (ou da cintura para
+   cima) e aperte **COMEÇAR**. Imite como num espelho. Cabem duas pessoas,
+   uma de cada lado da tela; o jogador 2 entra sozinho quando a câmera vê
+   duas pessoas por um instante.
+
+Cada movimento (um compasso da música) vale PERFEITO, SUPER, BOM, OK ou
+ERROU, conforme a direção dos braços e das pernas e quanto você se mexeu; a
+nota vai até 10.000, com 5 estrelas. Ficar parado não pontua. **C** mostra ou
+esconde a câmera e muda o tamanho dela.
+
+Na primeira vez o navegador pede para usar a câmera (permita) e baixa o
+detector de movimentos da internet. Sem câmera, dá para **Dançar sem nota**.
+
+### Celular como câmera
+
+A webcam do notebook costuma ficar baixa e perto demais. Um celular de pé, a
+2 ou 3 metros, pega todo mundo de corpo inteiro. Na tela de preparação do
+palco de dança tem um QR code: abra no celular, aperte **LIGAR CÂMERA** e
+apoie o celular. O palco troca para ele sozinho (e volta para a webcam se o
+celular parar).
+
+O celular roda o detector e manda só os pontos do corpo pela rede; nenhuma
+imagem sai dele. Como o navegador só libera a câmera em página segura, o app
+também abre a porta **8443** com HTTPS e um certificado próprio (em
+`data/tls/`). Na primeira vez o celular avisa que a conexão não é particular:
+toque em **Avançado › Continuar**.
+
+### Análise da dança e calibragem
+
+Toda dança com nota fica guardada (em `data/songs/<id>/sessions/`). No fim
+da dança, **Ver análise** (ou, na ficha da música, **Análise das danças**)
+mostra:
+
+- **Resumo**: nota, quanto a câmera viu os seus braços, quadros por segundo
+  da câmera, atraso típico e se você imitou como espelho ou do mesmo lado.
+- **Coach × você**: o vídeo com o esqueleto que o app marcou no coach e os
+  dois esqueletos sobrepostos, com a diferença de cada osso em graus. Use
+  0,25× e as setas (quadro a quadro) para achar onde a nota errou.
+- **Nota de cada movimento**: a linha do tempo; clique para ver o detalhe.
+- **Atraso**: em quanto tempo você vem depois do coach, comparado com a
+  janela que a nota aceita.
+- **Calibragem**: mexa na tolerância, na janela de atraso, no peso das
+  pernas, no castigo por ficar parado e nos limites de cada nota; a dança
+  é recalculada na hora. **Usar nas próximas danças** salva os valores.
+
+**Baixar dados** dá o JSON da dança (pontos de cada quadro e notas).
+
 ## Arquivos
 
 - `app/`: servidor (FastAPI). `party.py` é a festa (convidados, fila do palco,
   votos, sons); `worker.py` é a fila de preparo; `providers/` os serviços.
-- `static/`: telão (`index.html`), palco (`player.html`), celular
-  (`mobile.html`) e os sons do telão (`fx.js`).
+- `static/`: telão (`index.html`), palco (`player.html`), palco de dança
+  (`dance.html`, nota em `dance-score.js`), celular (`mobile.html`) e os sons
+  do telão (`fx.js`). `app/dance.py` prepara o gabarito da dança.
 - `data/`: biblioteca, faixas separadas, convidados e configurações (não vai
   para o git).

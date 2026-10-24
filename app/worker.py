@@ -6,7 +6,7 @@ import time
 import traceback
 from pathlib import Path
 
-from . import config, metadata, providers, store, usage, youtube
+from . import config, dance, metadata, providers, store, usage, youtube
 from .providers import Cancelled
 
 _cancel: set[str] = set()
@@ -40,6 +40,9 @@ def process(song_id: str):
 
     if song.get("task") == "backing":
         _separate_backing(song, out, work, provider, stage(0.0, 1.0))
+        return
+    if song.get("kind") == "dance":
+        _prepare_dance(song, out, work, stage)
         return
 
     karaoke_video = song.get("kind") == "karaoke"
@@ -102,6 +105,22 @@ def _separate_backing(song, out, work, provider, report):
     (work / "lead_new.mp3").replace(vocals)
     shutil.rmtree(work, ignore_errors=True)
     store.update(song["id"], status="ready", step="Pronta", progress=1.0, has_backing=True, task=None, backing_error=None)
+
+
+def _prepare_dance(song, out, work, stage):
+    """Modo dança: o vídeo toca inteiro (com a voz); o trabalho é marcar os passos do coach."""
+    store.update(song["id"], status="processing", provider=None, error=None, warning=None)
+    report = stage(0.0, 0.3)
+    report("Baixando o vídeo da dança...", 0)
+    video = out / "video.mp4"
+    if not video.exists():
+        youtube.download_video(song["video_id"], work, lambda f: report("Baixando o vídeo da dança...", f))
+        (work / "video.mp4").replace(video)
+    analysis = dance.analyze(video, video, work / "pose.json", stage(0.3, 1.0))
+    (work / "pose.json").replace(out / "pose.json")
+    shutil.rmtree(work, ignore_errors=True)
+    store.update(song["id"], status="ready", step="Pronta", progress=1.0, bpm=analysis["bpm"],
+                 moves=len(analysis["moves"]), separated=False, has_backing=False)
 
 
 def _finish(song, out, work, report, key_source, separated, has_backing, warning):

@@ -78,11 +78,57 @@ def download_audio(video_id: str, out_dir: Path, progress) -> Path:
     return dest
 
 
-KARAOKE_RE = re.compile(r"karaok|instrumental|playback|sem voz|backing track|minus one", re.I)
+def download_video(video_id: str, out_dir: Path, progress) -> Path:
+    """Baixa o vídeo (até 720p, 30 fps, H.264 + AAC, que todo navegador toca) em video.mp4."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # Vídeo e áudio vêm separados: a barra conta os dois downloads em sequência
+    done = {"parts": 0}
+
+    def hook(d):
+        total = d.get("total_bytes") or d.get("total_bytes_estimate")
+        if d.get("status") == "downloading" and total:
+            progress(min(1.0, (done["parts"] + (d.get("downloaded_bytes") or 0) / total) / 2))
+        elif d.get("status") == "finished":
+            done["parts"] += 1
+
+    opts = {
+        **_QUIET,
+        "format": "bv*+ba/b",
+        "format_sort": ["res:720", "fps:30", "vcodec:h264", "acodec:aac"],
+        "merge_output_format": "mp4",
+        "outtmpl": str(out_dir / "source.%(ext)s"),
+        "progress_hooks": [hook],
+    }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+    dest = out_dir / "video.mp4"
+    (out_dir / "source.mp4").replace(dest)
+    return dest
+
+
+KARAOKE_RE =re.compile(r"karaok|instrumental|playback|sem voz|backing track|minus one", re.I)
 
 
 def is_karaoke(title: str) -> bool:
     return bool(KARAOKE_RE.search(title))
+
+
+JUST_DANCE_RE = re.compile(r"just\s*dance(\s*\d{4})?(\s*(edition|unlimited|plus|\+))?", re.I)
+
+
+def guess_dance_title(title: str, channel: str) -> tuple[str, str]:
+    """'Just Dance 2024 - Flowers by Miley Cyrus | Gameplay' -> ('Miley Cyrus', 'Flowers')."""
+    parts = [p for p in re.split(r"\s*[|｜]\s*", title) if not JUST_DANCE_RE.fullmatch(p.strip(" -–—:()[]"))]
+    clean = JUST_DANCE_RE.sub("", " ".join(parts[:1]) or title)
+    clean = re.sub(r"\s*[\(\[][^\)\]]*[\)\]]", "", clean).strip(" -–—:'\"")
+    # 'Fanmade Gameplay: Thriller by ...': o que vem antes dos dois-pontos é descrição do vídeo
+    head, sep, _ = clean.partition(" by ")
+    if sep and ":" in head:
+        clean = clean[head.rindex(":") + 1:].strip(" '\"")
+    m = re.match(r"['\"“]?(.+?)['\"”]?\s+by\s+(.+)$", clean, re.I)
+    if m:
+        return m.group(2).strip(" .'\""), m.group(1).strip(" .'\"")
+    return guess_artist_title(clean, channel)
 
 
 def guess_artist_title(title: str, channel: str) -> tuple[str, str]:

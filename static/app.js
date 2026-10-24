@@ -149,9 +149,10 @@ function renderHero() {
         h("span", { class: `status ${songStatus(s).tone} pill` }, songStatus(s).label),
         s.duration ? h("span", { class: "pill" }, fmtTime(s.duration)) : null,
         s.key ? h("span", { class: "pill" }, `Tom: ${s.key.note} ${s.key.scale === "Minor" ? "menor" : "maior"}`) : null,
-        s.kind === "karaoke" ? h("span", { class: "pill" }, "Versão karaokê") : null),
+        s.kind === "karaoke" ? h("span", { class: "pill" }, "Versão karaokê") : null,
+        s.kind === "dance" ? h("span", { class: "pill" }, "Dança") : null),
       h("div", { class: "hero-actions" },
-        h("button", { class: "btn big", onclick: () => startEntry(next) }, icon("play", 22), "SOLTAR O SOM"),
+        h("button", { class: "btn big", onclick: () => startEntry(next) }, icon(s.kind === "dance" ? "dance" : "play", 22), s.kind === "dance" ? "BORA DANÇAR" : "SOLTAR O SOM"),
         h("button", { class: "btn ghost", onclick: () => api(`/api/stage/${next.id}/later`, { method: "POST" }).catch((e) => toast(e.message, true)) }, "Pular a vez"),
         h("button", { class: "btn ghost", onclick: () => removeEntry(next) }, "Tirar da fila")))));
 }
@@ -230,7 +231,7 @@ function renderLibrary() {
   for (const s of songs) {
     const st = songStatus(s);
     box.append(h("button", { class: "song-card", onclick: () => openSong(s), "aria-label": `${s.title}, ${s.artist}. ${st.label}` },
-      h("span", { class: "art" }, h("img", { src: s.cover, alt: "", loading: "lazy" }), h("span", { class: "play" }, icon("play", 20))),
+      h("span", { class: "art" }, h("img", { src: s.cover, alt: "", loading: "lazy" }), h("span", { class: "play" }, icon(s.kind === "dance" ? "dance" : "play", 20))),
       h("span", { class: "t" }, s.title),
       h("span", { class: "a" }, s.artist),
       h("span", { class: `status ${st.tone}` }, st.label)));
@@ -242,23 +243,26 @@ function renderLibrary() {
 function openSong(s) {
   const notes = [];
   if (s.key) notes.push(["", `Tom: ${s.key.note} ${s.key.scale === "Minor" ? "menor" : "maior"}`]);
-  if (s.kind === "karaoke") notes.push(["", "Versão karaokê (o vídeo já era instrumental)."]);
+  if (s.kind === "dance") notes.push(["", `Modo dança: ${s.moves || 0} movimentos${s.bpm ? ` · ${Math.round(s.bpm)} BPM` : ""}. A webcam dá a nota de quem dança.`]);
+  else if (s.kind === "karaoke") notes.push(["", "Versão karaokê (o vídeo já era instrumental)."]);
   else if (!s.separated) notes.push(["warn", s.warning || "A voz original ainda está na música (não passou pela separação)."]);
   else notes.push(["", s.has_backing ? "Voz principal e backing vocals separados." : "Voz separada. Os backing vocals estão junto com a voz."]);
   if (s.backing_error) notes.push(["err", `Falhou ao separar os backing vocals: ${s.backing_error}`]);
-  if (!s.has_lyrics) notes.push(["warn", "Sem letra. Escolhe uma em Trocar letra."]);
+  if (s.kind === "dance") { /* a dança não usa letra */ }
+  else if (!s.has_lyrics) notes.push(["warn", "Sem letra. Escolhe uma em Trocar letra."]);
   else if (!s.lyrics_synced) notes.push(["warn", "A letra não tem tempos. No palco, use Acertar letra › Gravar sincronia."]);
 
   const close = () => $("song-dlg").close();
   const actions = [
-    h("button", { class: "btn", onclick: () => singNow(s) }, icon("play", 18), "Cantar agora"),
+    h("button", { class: "btn", onclick: () => singNow(s) }, icon(s.kind === "dance" ? "dance" : "play", 18), s.kind === "dance" ? "Dançar agora" : "Cantar agora"),
     h("button", { class: "btn pink", onclick: async () => {
       try { await api("/api/stage", { method: "POST", body: { song_id: s.id } }); toast("Na fila!"); close(); } catch (e) { toast(e.message, true); }
     } }, icon("plus", 18), "Pôr na fila"),
-    h("button", { class: "btn ghost", onclick: () => { close(); openLyrics(s); } }, icon("lyrics", 18), "Trocar letra"),
+    s.kind === "dance" ? null : h("button", { class: "btn ghost", onclick: () => { close(); openLyrics(s); } }, icon("lyrics", 18), "Trocar letra"),
+    s.kind === "dance" ? h("a", { class: "btn ghost", href: `/review/${s.id}` }, icon("sliders", 18), "Análise das danças") : null,
     h("button", { class: "btn ghost", onclick: () => { close(); openCover(s); } }, icon("image", 18), "Trocar capa"),
   ];
-  if (s.kind !== "karaoke" && !s.separated) actions.push(h("button", { class: "btn ghost", onclick: () => { close(); separateNow(s); } }, icon("wand", 18), "Tirar a voz"));
+  if (s.kind === "original" && !s.separated) actions.push(h("button", { class: "btn ghost", onclick: () => { close(); separateNow(s); } }, icon("wand", 18), "Tirar a voz"));
   if (s.separated && !s.has_backing) actions.push(h("button", { class: "btn ghost", title: "Gasta mais 1 separação", onclick: () => { close(); separateBacking(s); } }, icon("wand", 18), "Separar backing vocals"));
   actions.push(h("button", { class: "btn danger", onclick: () => { close(); removeSong(s); } }, icon("trash", 18), "Apagar"));
 
@@ -301,6 +305,12 @@ async function removeSong(s) {
 setupFxKeys(() => STATE.fx && STATE.fx.favorites);
 
 $("open-fx").addEventListener("click", () => { Fx.play(""); $("fx-dlg").showModal(); });
+// Cartão "Dança": a busca passa a procurar vídeos de coreografia
+$("open-dance").addEventListener("click", () => {
+  $("search-form").querySelector('[data-kind="dance"]').click();
+  window.scrollTo(0, 0);
+  $("search-input").focus();
+});
 
 // ---------- Escolher letra ----------
 

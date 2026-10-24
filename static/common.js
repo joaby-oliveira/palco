@@ -29,16 +29,24 @@ async function api(path, opts = {}) {
 // Recebe o estado do servidor em tempo real e reconecta sozinho.
 // Efeitos sonoros chegam pelo mesmo canal, em mensagens separadas.
 function watchState(onState, onFx) {
+  const handle = (data) => { restartBanner(data); onState(data); };
   const connect = () => {
     const ws = new WebSocket(`ws://${location.host}/ws?client=${CLIENT}`);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
-      if (data.fx_event) { if (onFx) onFx(data.fx_event); } else onState(data);
+      if (data.fx_event) { if (onFx) onFx(data.fx_event); } else handle(data);
     };
     ws.onclose = () => setTimeout(connect, 1500);
   };
-  api("/api/state").then(onState).catch(() => {});
+  api("/api/state").then(handle).catch(() => {});
   connect();
+}
+
+// O código do app mudou e o servidor ainda é o antigo: funções novas dariam erro
+function restartBanner(state) {
+  if (!state.needs_restart || document.getElementById("restart-banner")) return;
+  document.body.append(h("div", { class: "restart-banner", id: "restart-banner", role: "alert" },
+    h("b", {}, "O app foi atualizado."), " Feche a janela preta do servidor e abra o iniciar.bat de novo para as novidades funcionarem."));
 }
 
 function h(tag, attrs = {}, ...children) {
@@ -196,6 +204,7 @@ function avatar(singer, cls = "") {
 function songStatus(s) {
   if (s.status === "error") return { tone: "err", label: "Deu ruim no preparo" };
   if (s.status !== "ready") return { tone: "warn", label: s.step || "Preparando…", busy: true };
+  if (s.kind === "dance") return { tone: "ok", label: "Pronta pra dançar" };
   if (!s.has_lyrics) return { tone: "warn", label: "Sem letra", fix: true };
   if (!s.lyrics_synced) return { tone: "warn", label: "Letra sem sincronia", fix: true };
   return { tone: "ok", label: "Pronta" };
@@ -295,7 +304,8 @@ function setupSearch(form, input, results, opts = {}) {
   buttons.forEach((b) => b.addEventListener("click", () => {
     kind = b.dataset.kind;
     buttons.forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); });
-    input.placeholder = kind === "karaoke" ? "Qual música? Vou buscar a versão karaokê" : placeholder;
+    input.placeholder = kind === "karaoke" ? "Qual música? Vou buscar a versão karaokê"
+      : kind === "dance" ? "Qual música? Vou buscar o vídeo de dança" : placeholder;
     if (input.value.trim()) form.requestSubmit();
   }));
   form.addEventListener("submit", async (e) => {
@@ -304,6 +314,7 @@ function setupSearch(form, input, results, opts = {}) {
     if (!q) return;
     const isLink = /youtu\.?be/.test(q);
     if (kind === "karaoke" && !isLink && !/karaok/i.test(q)) q += " karaoke";
+    if (kind === "dance" && !isLink && !/danc/i.test(q)) q += " just dance";
     if (opts.onOpen) opts.onOpen();
     results.replaceChildren(h("p", { class: "empty" }, "Procurando no YouTube…"));
     try { renderResults(results, await api(`/api/search?q=${encodeURIComponent(q)}`), kind, opts); }

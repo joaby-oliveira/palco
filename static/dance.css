@@ -1,0 +1,90 @@
+/* Palco de dança: o vídeo do coach na tela toda, placar e câmera por cima */
+#clip { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.dance .singer, .dance .up-next { background: rgba(11,6,20,.72); border-radius: 18px; padding: 12px 18px; }
+.dance .singer { top: 24px; left: 24px; }
+.dance .up-next { top: 24px; right: 24px; }
+
+/* Placar de cada jogador */
+.dancers { position: absolute; z-index: 2; left: 24px; bottom: 28px; display: flex; gap: 14px; transition: bottom .3s; }
+#stage:not(.idle) .dancers { bottom: 150px; }
+.dancer { position: relative; width: 300px; background: rgba(11,6,20,.78); border: 2px solid var(--c); border-radius: 20px; padding: 12px 16px 14px; }
+.dancer-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.dancer .who { font-family: var(--display); font-size: 16px; color: var(--c); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dancer .score { font-family: var(--display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.meter { position: relative; height: 12px; margin-top: 12px; border-radius: 6px; background: var(--surface-2); }
+.meter .fill { height: 100%; border-radius: 6px; background: var(--c); transition: width .6s cubic-bezier(.2,.7,.3,1); }
+.meter .star { position: absolute; top: 50%; transform: translate(-50%, -50%); color: var(--line); line-height: 0; }
+.meter .star.on { color: var(--gold); filter: drop-shadow(0 0 6px rgba(255,201,60,.8)); }
+.meter .star svg { fill: currentColor; }
+
+/* Nota de cada movimento, pulando em cima do placar */
+.rating { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); text-align: center; font-family: var(--display); font-size: 40px; line-height: 1; opacity: 0; pointer-events: none; -webkit-text-stroke: 2px rgba(0,0,0,.55); paint-order: stroke fill; }
+.rating.pop { animation: rate 1.1s ease-out forwards; }
+.rating.perfect { color: var(--gold); text-shadow: 0 0 24px rgba(255,201,60,.9); }
+.rating.super { color: var(--pink); }
+.rating.good { color: var(--green); }
+.rating.ok { color: var(--blue); }
+.rating.miss { color: #8E80AB; font-size: 32px; }
+@keyframes rate {
+  0% { opacity: 0; transform: translateY(16px) scale(.6); }
+  15% { opacity: 1; transform: translateY(0) scale(1.15); }
+  30% { transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+@media (prefers-reduced-motion: reduce) { .rating.pop { animation: none; opacity: 1; } }
+
+/* Câmera espelhada com o esqueleto */
+.cam-box { position: absolute; z-index: 4; right: 24px; bottom: 28px; width: 300px; aspect-ratio: 4 / 3; border-radius: 18px; overflow: hidden; background: #000; border: 2px solid var(--line); transition: bottom .3s, width .3s; }
+#stage:not(.idle) .cam-box { bottom: 150px; }
+.cam-box[data-size="sm"] { width: 200px; }
+.cam-box[data-size="lg"] { width: 420px; }
+.cam-box[data-size="off"] { display: none; }
+.cam-box video, .cam-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.cam-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+.cam-src { position: absolute; left: 8px; top: 8px; padding: 3px 10px; border-radius: 999px; background: rgba(11,6,20,.75); font-size: 12px; font-weight: 700; color: var(--muted); }
+/* Câmera do celular: só chegam os pontos, então aparece só o esqueleto */
+.cam-box.phone { background: #120A20; }
+.cam-box.phone video { display: none; }
+.cam-box.phone .cam-src { color: var(--green); }
+
+/* Na preparação a câmera fica grande, ao lado das instruções */
+#stage.prep .cam-box, #stage.prep .cam-box[data-size] { display: block; width: min(44vw, 640px); right: 5vw; bottom: 50%; transform: translateY(50%); border-color: var(--gold); }
+
+/* Antes de começar */
+.ready { position: absolute; inset: 0; z-index: 3; background: rgba(11,6,20,.9); display: flex; align-items: center; padding: 0 5vw; }
+.ready-body { width: min(44vw, 620px); display: flex; flex-direction: column; gap: 18px; }
+.ready .kicker { font-family: var(--display); font-size: 16px; letter-spacing: 6px; color: var(--pink); }
+.ready h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(36px, 4.6vw, 68px); line-height: 1; color: var(--gold); overflow-wrap: anywhere; }
+.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 18px; color: #E4DCF2; }
+.ready-status { font-size: 18px; font-weight: 700; padding: 12px 16px; border-radius: 14px; background: var(--surface-2); color: var(--muted); }
+.ready-status.ok { background: rgba(91,227,161,.15); color: var(--green); }
+.ready-status.err { background: rgba(255,107,107,.12); color: #FF9C9C; }
+.ready-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.phone-cam { display: flex; gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 12px; }
+.phone-cam img { flex: none; background: #fff; border-radius: 10px; padding: 4px; }
+.phone-cam div { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+.phone-cam div > b { font-size: 16px; color: var(--text); }
+.ready .hint { margin: 0; color: var(--dim); font-size: 14px; }
+
+/* Contagem 3, 2, 1 */
+.go { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; font-family: var(--display); font-size: 30vh; color: var(--gold); text-shadow: 0 12px 0 #7A3B00; pointer-events: none; }
+.go.pop { animation: go .8s ease-out; }
+@keyframes go { from { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } to { transform: scale(.9); opacity: .2; } }
+
+/* Fim: estrelas e pontos de cada jogador */
+.final-dancers { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.final-dancer { display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--surface); border: 2px solid var(--c); border-radius: 24px; padding: 18px 28px; min-width: 300px; }
+.final-dancer .who { font-family: var(--display); font-size: 20px; color: var(--c); }
+.final-dancer .stars { display: flex; gap: 4px; color: var(--line); line-height: 0; }
+.final-dancer .stars .on { color: var(--gold); }
+.final-dancer .stars svg { fill: currentColor; }
+.final-dancer .score { font-family: var(--display); font-size: 44px; line-height: 1; }
+.final-dancer .counts { font-size: 14px; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .dancer { width: 220px; }
+  .cam-box { width: 180px; }
+  .ready-body { width: 100%; }
+  #stage.prep .cam-box { display: none; }
+}

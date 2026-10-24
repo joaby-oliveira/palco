@@ -9,6 +9,8 @@ dependencies = [
     "httpx>=0.27",
     "qrcode>=7.4",
     "numpy>=1.26",
+    "mediapipe>=0.10.14",  # modo dança: marca a pose do coach no vídeo
+    "cryptography>=42",    # certificado HTTPS para a câmera do celular
 ]
 
 [project.optional-dependencies]
