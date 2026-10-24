@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karaoke</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+<link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><h1>🎤 Karaoke</h1></header>
+
+  <form class="card" id="search-form">
+    <div class="seg kinds" role="group" aria-label="Tipo de música">
+      <button type="button" data-kind="original" class="on">Música original</button>
+      <button type="button" data-kind="karaoke">Versão karaokê</button>
+    </div>
+    <label class="small" for="search-input">Link do YouTube ou nome da música</label>
+    <div class="row">
+      <input type="text" id="search-input" placeholder="Artista ou música..." autocomplete="off">
+      <button class="btn" type="submit">Buscar</button>
+    </div>
+    <div class="results" id="results"></div>
+  </form>
+
+  <div id="queue-section" hidden>
+    <div class="section-head"><h2>Na fila</h2></div>
+    <div id="queue"></div>
+  </div>
+
+  <div class="section-head">
+    <h2>Prontas para cantar</h2>
+    <input type="search" id="lib-filter" placeholder="Pesquisar...">
+  </div>
+  <div id="library"></div>
+</div>
+<script src="/static/common.js?v=2"></script>
+<script>
+  // Página do celular: adiciona músicas, acompanha a fila e apaga só as próprias.
+  const $ = (id) => document.getElementById(id);
+  let SONGS = [];
+  const mine = (s) => s.owner === CLIENT;
+
+  setupSearch($("search-form"), $("search-input"), $("results"));
+  $("lib-filter").addEventListener("input", renderLibrary);
+
+  watchState((s) => {
+    SONGS = s.songs;
+    const pending = SONGS.filter((x) => x.status !== "ready");
+    $("queue-section").hidden = !pending.length;
+    renderQueue($("queue"), pending, mine, async (song) => {
+      try { await api(`/api/songs/${song.id}/retry`, { method: "POST" }); } catch (e) { toast(e.message, true); }
+    });
+    renderLibrary();
+  });
+
+  function renderLibrary() {
+    const q = $("lib-filter").value.trim().toLowerCase();
+    const box = $("library");
+    const songs = SONGS.filter((s) => s.status === "ready" && (!q || `${s.artist} ${s.title}`.toLowerCase().includes(q))).reverse();
+    box.replaceChildren();
+    if (!songs.length) { box.append(h("p", { class: "empty" }, "Nenhuma música pronta ainda.")); return; }
+    for (const s of songs) {
+      const item = h("div", { class: "lib-item" },
+        h("div", { class: "body", style: "cursor:default" },
+          h("img", { src: s.cover, alt: "" }),
+          h("div", { class: "meta" },
+            h("div", { class: "title" }, s.title),
+            h("div", { class: "badges" }, h("span", { class: "sub" }, s.artist), mine(s) ? h("span", { class: "badge mine" }, "sua") : null))));
+      if (mine(s)) item.append(h("button", { class: "act", title: "Apagar", onclick: async () => {
+        if (!confirm(`Apagar "${s.title}"?`)) return;
+        try { await api(`/api/songs/${s.id}`, { method: "DELETE" }); } catch (e) { toast(e.message, true); }
+      } }, "🗑️"));
+      box.append(item);
+    }
+  }
+</script>
+</body>
+</html>

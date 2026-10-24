@@ -1,0 +1,15 @@
+[project]
+name = "karaoke"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "yt-dlp",
+    "httpx>=0.27",
+    "qrcode>=7.4",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+local = ["audio-separator[cpu]>=0.30", "audioread"]

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karaoke Player</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+<link rel="stylesheet" href="/static/style.css?v=2">
+<link rel="stylesheet" href="/static/player.css?v=2">
+</head>
+<body>
+<div id="stage">
+  <div class="player-head">
+    <a class="back" href="/">← voltar</a>
+    <h1 id="song-title"></h1>
+  </div>
+
+  <div id="lyrics-box">
+    <div id="lyrics-bg"></div>
+    <div id="lyrics-scroll"><div id="lyrics-lines"></div></div>
+    <div id="loading">Carregando faixas...</div>
+  </div>
+
+  <div id="controls">
+    <div class="ctl-row">
+      <span class="pill" id="mix-info" hidden></span>
+      <div class="seg" data-separated>
+        <button id="mode-original">Original</button>
+        <button id="mode-instrumental" class="on">Instrumental</button>
+      </div>
+      <label class="pill" id="backing-pill" data-separated>Vocais de suporte <input type="range" id="vol-backing" min="0" max="1" step="0.01" value="1"></label>
+      <label class="pill" data-separated>Vocais originais <input type="range" id="vol-lead" min="0" max="1" step="0.01" value="0"></label>
+      <label class="pill">Nota <select id="key-note"></select></label>
+      <label class="pill">Escala <select id="key-scale"><option>Major</option><option>Minor</option></select></label>
+    </div>
+    <div class="ctl-row">
+      <label class="pill">Desfoque do fundo <input type="range" id="blur" min="0" max="40" step="1" value="18"></label>
+      <label class="pill">Brilho do texto <input type="range" id="bright" min="0.15" max="1" step="0.01" value="0.75"></label>
+    </div>
+
+    <div class="transport">
+      <button id="play" class="round" title="Tocar / pausar (espaço)">▶</button>
+      <span id="time">0:00 / 0:00</span>
+      <input type="range" id="seek" min="0" max="1000" step="1" value="0">
+      <span class="vol">🔊 <input type="range" id="master" min="0" max="1" step="0.01" value="1"></span>
+    </div>
+
+    <div class="rec-bar" id="rec-bar" hidden>
+      <span class="rec-dot"></span>
+      <span id="rec-hint">Aperte <b>espaço</b> no começo de cada linha</span>
+      <button id="rec-mark" class="btn sm">Marcar linha (espaço)</button>
+      <button id="rec-undo" class="btn sm ghost" title="Backspace">Desfazer</button>
+      <button id="rec-done" class="btn sm ghost" title="Esc">Concluir e salvar</button>
+      <button id="rec-cancel" class="btn sm ghost">Cancelar</button>
+    </div>
+
+    <div class="sync">
+      <button id="rec-start" title="Toque a música e marque o começo de cada linha em tempo real">● Gravar sincronia</button>
+      <button id="sync-mouse" title="Ative e clique na linha da letra no momento em que ela começa">Sync com mouse</button>
+      <button data-shift="-0.5">-0.5s</button>
+      <button data-shift="-0.1">-0.1s</button>
+      <span id="offset">0.0s</span>
+      <button data-shift="0.1">+0.1s</button>
+      <button data-shift="0.5">+0.5s</button>
+      <span class="sep"></span>
+      <label title="Atraso da caixa Bluetooth: a letra espera esse tempo">BT <input type="number" id="bt" step="0.05" min="0" max="2"> s</label>
+      <button id="fullscreen" title="Tela cheia (F)">⛶</button>
+    </div>
+  </div>
+</div>
+<script src="/static/common.js?v=2"></script>
+<script src="/static/player.js?v=2"></script>
+</body>
+</html>
