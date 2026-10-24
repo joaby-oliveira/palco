@@ -38,7 +38,8 @@ done
 # reconectam sozinhos), terminar o que estava em andamento e recusar conexões novas, que o
 # retry do Traefik segura. Aí o novo lê o estado do disco e assume o alias palco-live.
 [ -n "$OLD" ] && docker stop -t 5 $OLD >/dev/null
-if ! docker exec "$NEW" curl -fs -o /dev/null -X POST http://localhost:8000/api/activate \n   || ! docker network connect --alias palco-live easypanel "$NEW"; then
+if ! docker exec "$NEW" curl -fs -o /dev/null -X POST http://localhost:8000/api/activate \
+   || ! docker network connect --alias palco-live easypanel "$NEW"; then
   echo "Ativação falhou; voltando o antigo."; docker logs --tail 30 "$NEW"
   docker rm -f "$NEW" >/dev/null; rm -f "$DATA/standby-$NEW"
   [ -n "$OLD" ] && docker start $OLD >/dev/null
