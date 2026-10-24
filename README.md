@@ -43,10 +43,13 @@ arquivo.
 - **Principais**: a seção de cima da mesa, igual para todo mundo da festa. A
   estrela tira um som dela; em **Seus sons**, a estrela traz o som para ela. A
   ordem fica em `data/sounds/favorites.json`. No palco, os 6 primeiros ficam na
-  coluna lateral, as teclas 1 a 9 e 0 disparam os dez primeiros e **Mais sons**
+  coluna lateral, as teclas 1 a 9 e 0 (também as do teclado numérico)
+  disparam os dez primeiros, no telão e no palco, e **Mais sons**
   (ou a tecla S) abre a mesa inteira.
 - Cada pessoa tem o seu canal: um som novo dela corta o anterior dela, sem
   mexer no som dos outros. **Parar sons** cala tudo.
+- Cada som tem um emoji (campo `emoji` no `sounds.json`). Quando alguém
+  dispara, o emoji sobe no telão com o nome de quem mandou e o nome do som.
 - No celular, o fone em cada botão toca uma prévia só no próprio celular, para
   saber qual é o som antes de soltar no telão.
 

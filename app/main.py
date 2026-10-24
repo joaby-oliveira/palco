@@ -289,7 +289,7 @@ def vote(request: Request, body: dict = Body(...)):
 @app.post("/api/fx/{name}")
 def fx(name: str, request: Request):
     try:
-        party.fx(name, client_id(request))
+        party.fx(name, client_id(request), is_host(request))
     except KeyError as e:
         raise HTTPException(404, str(e.args[0]))
     return {"ok": True}

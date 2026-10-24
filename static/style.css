@@ -261,7 +261,8 @@ dialog::backdrop { background: rgba(8,4,14,.75); backdrop-filter: blur(4px); }
 .sound-board .lib-filter { min-width: 0; width: 100%; }
 .pads.sounds .pad.snd { aspect-ratio: auto; min-height: 76px; font-family: var(--body); font-weight: 800; font-size: 14px; line-height: 1.15; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12), 0 6px 0 rgba(0,0,0,.35); overflow-wrap: anywhere; }
 .pad-wrap { position: relative; min-width: 0; }
-.pad-wrap .pad { width: 100%; height: 100%; padding-top: 44px; }
+.pad-wrap .pad { width: 100%; height: 100%; padding-top: 48px; }
+.pad .emo { position: absolute; top: 9px; left: 11px; font-size: 28px; line-height: 1; pointer-events: none; }
 .pad-tools { position: absolute; top: 7px; right: 7px; display: flex; gap: 4px; }
 .pad-tools .tool { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(17,10,28,.55); color: #FBF6FF; display: grid; place-items: center; cursor: pointer; padding: 0; }
 .pad-tools .tool:hover { background: rgba(17,10,28,.8); }
@@ -269,6 +270,22 @@ dialog::backdrop { background: rgba(8,4,14,.75); backdrop-filter: blur(4px); }
 
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--surface-2); border: 1px solid var(--line); padding: 12px 18px; border-radius: 14px; z-index: 50; max-width: calc(100vw - 32px); box-shadow: 0 10px 40px rgba(0,0,0,.4); font-weight: 600; }
 .toast.err { border-color: var(--danger); }
+/* Reações que sobem no telão quando alguém dispara um som */
+.reactions { position: fixed; inset: 0; pointer-events: none; z-index: 70; overflow: hidden; }
+.reaction { position: absolute; bottom: -40px; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: rise 3.3s cubic-bezier(.2,.7,.3,1) forwards; }
+.reaction .emo { font-size: clamp(64px, 8vw, 112px); line-height: 1; filter: drop-shadow(0 8px 24px rgba(0,0,0,.5)); animation: wobble .6s ease-in-out 3 alternate; }
+.reaction .who { background: var(--pink); color: var(--pink-ink); font-weight: 800; font-size: 20px; padding: 6px 16px; border-radius: 999px; white-space: nowrap; box-shadow: 0 8px 30px rgba(255,79,163,.4); }
+.reaction .what { background: rgba(17,10,28,.85); color: var(--text); font-size: 14px; font-weight: 600; padding: 4px 12px; border-radius: 999px; white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+@keyframes rise {
+  0% { transform: translateY(0) scale(.4); opacity: 0; }
+  14% { transform: translateY(-32vh) scale(1.08); opacity: 1; }
+  24% { transform: translateY(-36vh) scale(1); }
+  78% { opacity: 1; }
+  100% { transform: translateY(-72vh) scale(.95); opacity: 0; }
+}
+@keyframes wobble { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
+@media (prefers-reduced-motion: reduce) { .reaction, .reaction .emo { animation-duration: .01s; } .reaction { bottom: 30vh; } }
+
 .fx-toast { position: fixed; left: 50%; top: 24px; transform: translateX(-50%); background: var(--pink); color: var(--pink-ink); padding: 10px 20px; border-radius: 999px; z-index: 60; font-family: var(--display); font-size: 18px; box-shadow: 0 10px 40px rgba(255,79,163,.4); animation: pop .25s ease-out; pointer-events: none; }
 @keyframes pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } }
 

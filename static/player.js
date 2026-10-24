@@ -353,12 +353,14 @@ const FX_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 function renderRail(fx) {
   const byId = Object.fromEntries((fx.sounds || []).map((s) => [s.id, s]));
   $("fx-rail").replaceChildren(...(fx.favorites || []).slice(0, 6).map((id, i) => h("button", { class: `pad ${paletteFor(byId[id].color)}`, onclick: () => fireFx(id), title: `${byId[id].name} (tecla ${FX_KEYS[i]})` },
-    h("span", { class: "rail-name" }, byId[id].name), h("span", { class: "key" }, FX_KEYS[i]))),
+    h("span", { class: "rail-name" }, h("span", { class: "rail-emo", "aria-hidden": "true" }, byId[id].emoji || "🔊"), byId[id].name), h("span", { class: "key" }, FX_KEYS[i]))),
     h("button", { class: "pad plum more", onclick: () => { $("sounds-dlg").showModal(); wake(); }, title: "Todos os sons (S)" }, h("span", {}, "Mais sons"), h("span", { class: "key" }, "S")));
 }
 document.querySelector("[data-dlg-close]").addEventListener("click", () => $("sounds-dlg").close());
 
 // ---------- Teclado ----------
+
+setupFxKeys(() => STATE && STATE.fx.favorites);
 
 document.addEventListener("keydown", (e) => {
   if (e.target.matches && e.target.matches("input[type=number], input[type=text], select")) return;
@@ -373,8 +375,6 @@ document.addEventListener("keydown", (e) => {
   }
   if ($("sounds-dlg").open) return;
   if (e.key === "s" || e.key === "S") { $("sounds-dlg").showModal(); return; }
-  const fxIdx = FX_KEYS.indexOf(e.key);
-  if (fxIdx >= 0 && !e.ctrlKey && !e.altKey && !e.metaKey) { const id = STATE && STATE.fx.favorites[fxIdx]; if (id) fireFx(id); return; }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
   else if (e.key === "f" || e.key === "F") toggleFullscreen();
   else if (e.key === "ArrowRight") seek(now() + 5);
@@ -419,7 +419,7 @@ watchState((s) => {
   renderParty();
 }, (fx) => {
   Fx.play(fx.name, fx.client);
-  if (fx.name !== "stop") fxToast(`${fx.label || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
+  showReaction(fx);
 });
 
 // ---------- Fim da música ----------

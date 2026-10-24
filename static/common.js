@@ -162,6 +162,7 @@ function renderSoundBoard(box, fx, opts = {}) {
     }, icon(fav ? "starOn" : "star", 16)));
     return h("div", { class: "pad-wrap" },
       h("button", { class: `pad snd ${paletteFor(s.color)}`, onclick: () => fireFx(s.id) },
+        h("span", { class: "emo", "aria-hidden": "true" }, s.emoji || "🔊"),
         h("span", {}, s.name), opts.keys && fav && KEYS[i] ? h("span", { class: "key" }, KEYS[i]) : null),
       tools);
   };
@@ -211,12 +212,30 @@ function toast(msg, isErr = false) {
   setTimeout(() => t.remove(), isErr ? 6000 : 2500);
 }
 
-// Aviso grande no telão de qual efeito tocou
-function fxToast(text) {
-  document.querySelectorAll(".fx-toast").forEach((x) => x.remove());
-  const t = h("div", { class: "fx-toast" }, text);
-  document.body.append(t);
-  setTimeout(() => t.remove(), 1600);
+// No telão, cada som disparado sobe na tela como uma reação: o emoji, quem mandou e qual som
+function showReaction(fx) {
+  let layer = document.querySelector(".reactions");
+  if (!layer) { layer = h("div", { class: "reactions", "aria-live": "polite" }); document.body.append(layer); }
+  const r = h("div", { class: "reaction", style: `left:${8 + Math.random() * 70}%` },
+    h("span", { class: "emo", "aria-hidden": "true" }, fx.emoji || "🔊"),
+    h("span", { class: "who" }, fx.by || "Alguém"),
+    h("span", { class: "what" }, fx.label || ""));
+  layer.append(r);
+  setTimeout(() => r.remove(), 3400);
+}
+
+// Teclas 1 a 9 e 0 (em cima das letras ou no teclado numérico) disparam os sons da seção principal
+const FX_CODES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+function setupFxKeys(getFavorites) {
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+    const t = e.target;
+    if (t && t.matches && t.matches("input:not([type=range]), textarea, select")) return;
+    const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code);
+    if (!m) return;
+    const id = (getFavorites() || [])[FX_CODES.indexOf(m[1])];
+    if (id) { e.preventDefault(); fireFx(id); }
+  });
 }
 
 // Prévia de 5 segundos de um resultado da busca

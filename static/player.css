@@ -26,7 +26,7 @@ html, body { height: 100%; overflow: hidden; }
 .up-next .qr img { width: 100%; height: 100%; }
 
 /* Letra */
-#lyrics-box { position: absolute; z-index: 1; left: 6vw; right: calc(6vw + 150px); top: 170px; bottom: 150px; --dim: .6; }
+#lyrics-box { position: absolute; z-index: 1; left: 6vw; right: calc(6vw + 186px); top: 170px; bottom: 150px; --dim: .6; }
 #lyrics-scroll { position: absolute; inset: 0; overflow: hidden; mask-image: linear-gradient(transparent, #000 12%, #000 85%, transparent); }
 #lyrics-scroll.free { overflow-y: auto; }
 #lyrics-lines { position: absolute; left: 0; right: 0; top: 0; transition: transform .5s cubic-bezier(.2,.7,.3,1); text-align: center; }
@@ -50,8 +50,9 @@ html, body { height: 100%; overflow: hidden; }
 /* Botões de efeito na lateral */
 .fx-rail { position: absolute; z-index: 2; right: 30px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; }
 .fx-rail .rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fx-rail .rail-emo { font-size: 18px; margin-right: 6px; vertical-align: -2px; }
 .fx-rail .pad.more { height: 46px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15), 0 6px 0 rgba(0,0,0,.35); }
-.fx-rail .pad { aspect-ratio: auto; width: 132px; height: 58px; border-radius: 18px; font-size: 13px; align-items: center; padding: 0 14px; }
+.fx-rail .pad { aspect-ratio: auto; width: 168px; height: 58px; border-radius: 18px; font-size: 13px; align-items: center; padding: 0 14px; }
 
 /* Barra de controle (some quando a música está tocando e ninguém mexe) */
 #controls { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; padding: 60px 40px 24px; background: linear-gradient(transparent, rgba(11,6,20,.92) 45%); display: flex; flex-direction: column; gap: 12px; transition: opacity .3s, transform .3s; }

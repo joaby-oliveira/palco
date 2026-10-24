@@ -91,7 +91,7 @@ watchState((s) => {
   renderLibrary();
 }, (fx) => {
   Fx.play(fx.name, fx.client);
-  if (fx.name !== "stop") fxToast(`${fx.label || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
+  showReaction(fx);
 });
 
 setupSearch($("search-form"), $("search-input"), $("results"), {
@@ -297,6 +297,8 @@ async function removeSong(s) {
 }
 
 // ---------- Mesa de efeitos ----------
+
+setupFxKeys(() => STATE.fx && STATE.fx.favorites);
 
 $("open-fx").addEventListener("click", () => { Fx.play(""); $("fx-dlg").showModal(); });
 
