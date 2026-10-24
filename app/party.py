@@ -199,10 +199,30 @@ def snapshot(client: str) -> dict:
 # ---------- Efeitos sonoros ----------
 
 def fx(name: str, client: str):
+    """Toca um efeito no telão: um dos sintetizados, um som da pasta data/sounds ou "stop" (cala tudo)."""
     global fx_event
-    if name not in FX:
+    custom = {s["id"]: s for s in sounds()}
+    if name != "stop" and name not in FX and name not in custom:
         raise KeyError("Efeito desconhecido.")
-    fx_event = {"seq": next(_fx_seq), "name": name, "by": singer(client)["name"]}
+    label = FX.get(name) or (custom[name]["name"] if name in custom else "Silêncio")
+    fx_event = {"seq": next(_fx_seq), "name": name, "label": label, "by": singer(client)["name"]}
+
+
+def sounds() -> list[dict]:
+    """Sons próprios em data/sounds: os listados em sounds.json (com nome e cor) e
+    qualquer outro .mp3/.wav/.ogg jogado na pasta (o nome vem do arquivo)."""
+    d = config.DATA_DIR / "sounds"
+    if not d.exists():
+        return []
+    listed = []
+    index = d / "sounds.json"
+    if index.exists():
+        listed = [s for s in json.loads(index.read_text(encoding="utf-8")) if (d / s["file"]).exists()]
+    known = {s["file"] for s in listed}
+    for f in sorted(d.iterdir()):
+        if f.suffix.lower() in (".mp3", ".wav", ".ogg") and f.name not in known:
+            listed.append({"id": f.stem, "name": f.stem.replace("-", " ").replace("_", " "), "file": f.name, "color": "#3A2A5A"})
+    return listed
 
 
 def fx_files() -> dict[str, str]:

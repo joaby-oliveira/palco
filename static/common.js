@@ -104,6 +104,49 @@ function fillIcons(root = document) {
   root.querySelectorAll("i[data-icon]").forEach((i) => i.replaceWith(icon(i.dataset.icon, parseInt(i.dataset.size || "20", 10))));
 }
 
+// Leva a cor que veio do site do som para a cor mais parecida da paleta do Palco
+function paletteFor(hex) {
+  const n = parseInt((hex || "#3A2A5A").slice(1), 16);
+  const r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (max > 0.85 && d < 0.3) return "white";
+  if (max < 0.35 || d < 0.15) return "plum";
+  let hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  hue = (hue * 60 + 360) % 360;
+  if (hue < 20 || hue >= 290) return "pink";
+  if (hue < 45) return "orange";
+  if (hue < 70) return "gold";
+  if (hue < 170) return "green";
+  return "blue";
+}
+
+function fireFx(name) {
+  return api(`/api/fx/${encodeURIComponent(name)}`, { method: "POST" }).catch((e) => toast(e.message, true));
+}
+
+// Mesa com os sons próprios (data/sounds): busca + grade de botões + parar tudo.
+// Só redesenha quando a lista muda, para não perder o que foi digitado na busca.
+function renderSoundBoard(box, sounds) {
+  const key = sounds.map((s) => s.id).join("|");
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  if (!sounds.length) { box.replaceChildren(); return; }
+  const input = h("input", { type: "search", class: "lib-filter", placeholder: `Procurar entre ${sounds.length} sons`, "aria-label": "Procurar som" });
+  const grid = h("div", { class: "pads sounds" });
+  const draw = () => {
+    const q = input.value.trim().toLowerCase();
+    const list = sounds.filter((s) => !q || s.name.toLowerCase().includes(q));
+    grid.replaceChildren(...list.map((s) => h("button", { class: `pad snd ${paletteFor(s.color)}`, onclick: () => fireFx(s.id) }, h("span", {}, s.name))));
+    if (!list.length) grid.append(h("p", { class: "empty" }, "Nenhum som com esse nome."));
+  };
+  input.addEventListener("input", draw);
+  draw();
+  box.replaceChildren(
+    h("div", { class: "sound-head" }, h("h3", { class: "h-section", style: "font-size:16px" }, "SEUS SONS"),
+      h("button", { class: "btn sm danger", onclick: () => fireFx("stop") }, icon("stop", 14), "Parar sons")),
+    input, grid);
+}
+
 function avatar(singer, cls = "") {
   const name = (singer && singer.name) || "?";
   return h("span", { class: `avatar ${cls}`, style: `background:${(singer && singer.color) || "#FFC93C"}`, "aria-hidden": "true" }, name.trim()[0].toUpperCase());

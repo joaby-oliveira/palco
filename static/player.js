@@ -349,9 +349,11 @@ $("controls").addEventListener("mouseleave", wake);
 // ---------- Efeitos sonoros ----------
 
 const FX_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-function fireFx(name) { api(`/api/fx/${name}`, { method: "POST" }).catch((e) => toast(e.message, true)); }
 $("fx-rail").replaceChildren(...FX_PADS.slice(0, 6).map(([name, label, color], i) => h("button", { class: `pad ${color}`, onclick: () => fireFx(name), title: `Tecla ${FX_KEYS[i]}` },
-  h("span", {}, label.split(" ")[0]), h("span", { class: "key" }, FX_KEYS[i]))));
+  h("span", {}, label.split(" ")[0]), h("span", { class: "key" }, FX_KEYS[i]))),
+  h("button", { class: "pad plum more", onclick: () => { $("sounds-dlg").showModal(); wake(); }, title: "Todos os sons (S)" }, h("span", {}, "Mais sons"), h("span", { class: "key" }, "S")));
+$("dlg-pads").replaceChildren(...FX_PADS.map(([name, label, color]) => h("button", { class: `pad ${color}`, onclick: () => fireFx(name) }, h("span", {}, label))));
+document.querySelector("[data-dlg-close]").addEventListener("click", () => $("sounds-dlg").close());
 
 // ---------- Teclado ----------
 
@@ -366,6 +368,8 @@ document.addEventListener("keydown", (e) => {
     if (e.code === "Backspace") { e.preventDefault(); undoMark(); return; }
     if (e.code === "Escape" && !document.fullscreenElement) { finishRec(true); return; }
   }
+  if ($("sounds-dlg").open) return;
+  if (e.key === "s" || e.key === "S") { $("sounds-dlg").showModal(); return; }
   const fxIdx = FX_KEYS.indexOf(e.key);
   if (fxIdx >= 0 && !e.ctrlKey && !e.altKey && !e.metaKey) { fireFx(FX_PADS[fxIdx][0]); return; }
   if (e.code === "Space") { e.preventDefault(); playing ? pause() : play(); }
@@ -407,10 +411,12 @@ function renderParty() {
 watchState((s) => {
   STATE = s;
   Fx.setFiles(s.fx.files);
+  Fx.setSounds(s.fx.sounds);
+  renderSoundBoard($("dlg-sounds"), s.fx.sounds || []);
   renderParty();
 }, (fx) => {
   Fx.play(fx.name);
-  fxToast(`${(STATE && STATE.fx.names[fx.name]) || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
+  if (fx.name !== "stop") fxToast(`${fx.label || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
 });
 
 // ---------- Fim da música ----------

@@ -5,23 +5,32 @@ const Fx = (() => {
   let ctx = null;
   let out = null;
   let noise = null;
+  let vol = null;     // volume geral dos efeitos
   let files = {};
+  let sounds = {};    // id -> arquivo em data/sounds
   const buffers = {};
   let volume = 0.7;
 
   function init() {
     if (ctx) return;
     ctx = new AudioContext();
-    out = ctx.createGain();
-    out.gain.value = volume;
+    vol = ctx.createGain();
+    vol.gain.value = volume;
+    newBus();
     // Um compressor evita que vários efeitos juntos estourem a caixa
     const comp = ctx.createDynamicsCompressor();
-    out.connect(comp);
+    vol.connect(comp);
     comp.connect(ctx.destination);
     noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
+  // Tudo que toca passa por um "barramento"; parar = desligar o barramento e criar outro
+  function newBus() {
+    out = ctx.createGain();
+    out.connect(vol);
+  }
+
   // O navegador só libera o som depois de um clique ou tecla na página
   const unlock = () => { init(); ctx.resume(); };
   document.addEventListener("pointerdown", unlock);
@@ -221,13 +230,14 @@ const Fx = (() => {
     },
   };
 
-  async function playFile(name) {
-    if (!buffers[name]) {
-      const r = await fetch(`/media/fx/${encodeURIComponent(files[name])}`);
-      buffers[name] = await ctx.decodeAudioData(await r.arrayBuffer());
+  async function playUrl(url) {
+    if (!buffers[url]) {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(r.statusText);
+      buffers[url] = await ctx.decodeAudioData(await r.arrayBuffer());
     }
     const s = ctx.createBufferSource();
-    s.buffer = buffers[name];
+    s.buffer = buffers[url];
     s.connect(out);
     s.start();
   }
@@ -235,11 +245,19 @@ const Fx = (() => {
   return {
     names: Object.keys(SYNTH),
     setFiles(f) { files = f || {}; },
-    setVolume(v) { volume = v; if (out) out.gain.value = v; },
+    setSounds(list) { sounds = Object.fromEntries((list || []).map((s) => [s.id, s.file])); },
+    setVolume(v) { volume = v; if (vol) vol.gain.value = v; },
+    stop() {
+      if (!ctx) return;
+      out.disconnect();
+      newBus();
+    },
     play(name) {
       init();
       ctx.resume();
-      if (files[name]) { playFile(name).catch(() => SYNTH[name] && SYNTH[name](ctx.currentTime + 0.02)); return; }
+      if (name === "stop") { this.stop(); return; }
+      if (sounds[name]) { playUrl(`/media/sounds/${encodeURIComponent(sounds[name])}`).catch(() => {}); return; }
+      if (files[name]) { playUrl(`/media/fx/${encodeURIComponent(files[name])}`).catch(() => SYNTH[name] && SYNTH[name](ctx.currentTime + 0.02)); return; }
       if (SYNTH[name]) SYNTH[name](ctx.currentTime + 0.02);
     },
   };

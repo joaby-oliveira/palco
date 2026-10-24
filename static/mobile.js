@@ -48,6 +48,7 @@ watchState((s) => {
   renderMyTurn();
   renderQueue();
   renderLibrary();
+  renderSoundBoard($("sounds"), s.fx.sounds || []);
 });
 
 const mine = (e) => e.client === CLIENT;

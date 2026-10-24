@@ -82,6 +82,8 @@ watchState((s) => {
   const n = s.party.online;
   $("online-count").textContent = n === 1 ? "1 na festa" : `${n} na festa`;
   Fx.setFiles(s.fx.files);
+  Fx.setSounds(s.fx.sounds);
+  renderSoundBoard($("fx-sounds"), s.fx.sounds || []);
   Fx.setVolume(s.config.fx_volume ?? 0.7);
   renderAlert();
   renderHero();
@@ -90,7 +92,7 @@ watchState((s) => {
   renderLibrary();
 }, (fx) => {
   Fx.play(fx.name);
-  fxToast(`${(STATE.fx && STATE.fx.names[fx.name]) || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
+  if (fx.name !== "stop") fxToast(`${fx.label || fx.name}${fx.by && fx.by !== "Alguém" ? " · " + fx.by : ""}`);
 });
 
 setupSearch($("search-form"), $("search-input"), $("results"), {
@@ -298,7 +300,7 @@ async function removeSong(s) {
 // ---------- Mesa de efeitos ----------
 
 const fxKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-$("fx-pads").replaceChildren(...FX_PADS.map(([name, label, color], i) => h("button", { class: `pad ${color}`, onclick: () => api(`/api/fx/${name}`, { method: "POST" }).catch((e) => toast(e.message, true)) },
+$("fx-pads").replaceChildren(...FX_PADS.map(([name, label, color], i) => h("button", { class: `pad ${color}`, onclick: () => fireFx(name) },
   h("span", {}, label), fxKeys[i] ? h("span", { class: "key" }, fxKeys[i]) : null)));
 $("open-fx").addEventListener("click", () => { Fx.play(""); $("fx-dlg").showModal(); });
 

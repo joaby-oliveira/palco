@@ -42,6 +42,14 @@ verdade, coloque um arquivo em `data/fx/` com o nome do efeito (`aplausos`,
 `tchan`, `vaia`, `fogos`) e extensão `.mp3`, `.wav` ou `.ogg`. No palco, as
 teclas 1 a 9 e 0 disparam os dez primeiros.
 
+### Seus sons
+
+Qualquer áudio em `data/sounds/` aparece em **Seus sons**, na aba Efeitos do
+celular, na mesa de efeitos do telão e no palco (botão **Mais sons** ou tecla
+S). O `data/sounds/sounds.json` dá nome e cor a cada arquivo; um arquivo que
+não estiver nele entra com o nome do arquivo. **Parar sons** cala tudo que
+estiver tocando (bom para os sons longos).
+
 ## Versão karaokê e uso sem separação
 
 - Na busca, escolha **Já é karaokê** para procurar vídeos que já são

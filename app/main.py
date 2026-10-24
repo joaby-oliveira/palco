@@ -68,7 +68,7 @@ def state(host: bool, client: str = "") -> dict:
         "session_url": session_url(),
         "is_host": host,
         "party": party.snapshot(client),
-        "fx": {"names": party.FX, "files": party.fx_files()},
+        "fx": {"names": party.FX, "files": party.fx_files(), "sounds": party.sounds()},
     }
 
 
@@ -301,6 +301,13 @@ def fx_file(name: str):
     if not f or f != name:
         raise HTTPException(404)
     return FileResponse(config.DATA_DIR / "fx" / f)
+
+
+@app.get("/media/sounds/{name}")
+def sound_file(name: str):
+    if not any(s["file"] == name for s in party.sounds()):
+        raise HTTPException(404)
+    return FileResponse(config.DATA_DIR / "sounds" / name)
 
 
 # ---------- Letra e capa ----------
