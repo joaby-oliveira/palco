@@ -31,7 +31,7 @@ async function api(path, opts = {}) {
 function watchState(onState, onFx) {
   const handle = (data) => { restartBanner(data); onState(data); };
   const connect = () => {
-    const ws = new WebSocket(`ws://${location.host}/ws?client=${CLIENT}`);
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?client=${CLIENT}`);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.fx_event) { if (onFx) onFx(data.fx_event); } else handle(data);

@@ -100,7 +100,7 @@ function setSource() {
 }
 
 function listenPhones() {
-  const ws = new WebSocket(`ws://${location.host}/ws/stage-cam`);
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/stage-cam`);
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
     if (data.type === "pose") {
