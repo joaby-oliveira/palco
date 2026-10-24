@@ -415,6 +415,45 @@ const PROVIDER_FIELDS = {
 
 const SECRET = new Set(["mvsep_api_token", "musicai_api_key", "replicate_api_token"]);
 
+// Cookies do YouTube: em servidor (IP de datacenter) o YouTube pede login para baixar
+function youtubeCookiesBox() {
+  const status = h("div", { class: "ok-text" }, "Conferindo…");
+  const remove = h("button", { class: "btn ghost", type: "button", hidden: true }, "Apagar cookies");
+  const file = h("input", { type: "file", accept: ".txt,text/plain", hidden: true });
+  const send = h("button", { class: "btn", type: "button" }, "Enviar cookies.txt");
+  const show = (info) => {
+    status.className = info.set ? "ok-text" : "hint";
+    status.textContent = info.set
+      ? `Cookies enviados em ${new Date(info.updated * 1000).toLocaleDateString("pt-BR")}.`
+      : "Sem cookies. Em casa não precisa; no servidor o YouTube pede login para baixar.";
+    remove.hidden = !info.set;
+  };
+  api("/api/youtube/cookies").then(show).catch(() => { status.textContent = ""; });
+  send.addEventListener("click", () => file.click());
+  file.addEventListener("change", async () => {
+    const f = file.files[0];
+    if (!f) return;
+    send.disabled = true;
+    status.className = "hint";
+    status.textContent = "Testando no YouTube…";
+    try {
+      const res = await api("/api/youtube/cookies", { method: "POST", body: { text: await f.text() } });
+      show(res);
+      toast(res.message, !res.ok);
+      if (!res.ok) { status.className = "err-text"; status.textContent = res.message; }
+    } catch (e) { toast(e.message, true); api("/api/youtube/cookies").then(show).catch(() => {}); }
+    send.disabled = false;
+    file.value = "";
+  });
+  remove.addEventListener("click", async () => {
+    try { show(await api("/api/youtube/cookies", { method: "DELETE" })); } catch (e) { toast(e.message, true); }
+  });
+  const help = h("div", { class: "hint" });
+  help.innerHTML = 'Numa janela anônima, entre no YouTube com uma conta (de preferência uma secundária), exporte com a extensão <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank">Get cookies.txt LOCALLY</a> e feche a janela anônima sem sair da conta. Os cookies vencem de tempos em tempos: quando o download voltar a falhar, envie de novo.';
+  return h("div", { class: "prov" }, status, help,
+    h("div", { style: "display:flex; gap:8px; margin-top:10px" }, send, remove, file));
+}
+
 async function openSettings() {
   const { config: cfg, providers } = await api("/api/config");
   const body = $("settings-body");
@@ -427,6 +466,8 @@ async function openSettings() {
     h("div", { class: "hint", style: "margin:-6px 0 4px" }, "Quer o som de verdade de algum efeito? Coloque um arquivo em data/fx com o nome dele (aplausos.mp3, buzina.mp3, errou.mp3…)."),
     h("label", { class: "field", style: "margin-top:12px" }, h("span", {}, "Atraso da caixa Bluetooth (segundos): a letra espera esse tempo"),
       h("input", { type: "number", id: "bt-delay", step: "0.05", min: "0", max: "2", value: cfg.bt_delay, style: "width:120px" })),
+    h("div", { class: "dlg-section" }, "YOUTUBE"),
+    youtubeCookiesBox(),
     h("div", { class: "dlg-section" }, "SEPARAÇÃO DE VOZ"),
   );
   for (const p of providers) {

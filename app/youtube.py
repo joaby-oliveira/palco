@@ -17,6 +17,56 @@ def _base() -> dict:
     return {**_QUIET, "cookiefile": str(COOKIES)} if COOKIES.exists() else dict(_QUIET)
 
 
+# Vídeo curto e estável para conferir se os cookies passam pelo bloqueio
+_TEST_VIDEO = "jNQXAC9IVRw"
+
+
+def _is_bot_check(msg: str) -> bool:
+    return "not a bot" in msg or "Sign in to confirm" in msg
+
+
+def friendly_error(msg: str) -> str:
+    """Troca o "Sign in to confirm you're not a bot" do YouTube pelo que fazer."""
+    if not _is_bot_check(msg):
+        return msg
+    if COOKIES.exists():
+        return ("O YouTube recusou os cookies (venceram ou a conta saiu). Exporte de novo e envie em "
+                "Ajustes do anfitrião › YouTube.")
+    return ("O YouTube pediu login para baixar (acontece em servidor). Envie os cookies de uma conta "
+            "em Ajustes do anfitrião › YouTube.")
+
+
+def cookies_info() -> dict:
+    if not COOKIES.exists():
+        return {"set": False}
+    return {"set": True, "updated": COOKIES.stat().st_mtime}
+
+
+def save_cookies(text: str) -> dict:
+    """Guarda um cookies.txt (formato Netscape) e confere no YouTube se ele resolve o bloqueio."""
+    lines = [ln for ln in text.splitlines() if ln.strip() and (not ln.startswith("#") or ln.startswith("#HttpOnly_"))]
+    youtube_lines = [ln for ln in lines if len(ln.split("\t")) >= 7 and "youtube.com" in ln.split("\t")[0]]
+    if not youtube_lines:
+        raise ValueError("Esse arquivo não tem cookies do youtube.com. Exporte com a extensão "
+                         "\"Get cookies.txt LOCALLY\" estando em youtube.com, logado.")
+    tmp = COOKIES.with_suffix(".tmp")
+    tmp.write_text(text if text.startswith("# Netscape") else "# Netscape HTTP Cookie File\n" + text, encoding="utf-8")
+    tmp.chmod(0o600)
+    tmp.replace(COOKIES)
+    try:
+        with yt_dlp.YoutubeDL({**_base(), "format": "bestaudio/best"}) as ydl:
+            ydl.extract_info(f"https://www.youtube.com/watch?v={_TEST_VIDEO}", download=False)
+    except Exception as e:  # noqa: BLE001
+        msg = str(e)
+        return {**cookies_info(), "ok": False,
+                "message": friendly_error(msg) if _is_bot_check(msg) else f"Cookies salvos, mas o teste falhou: {msg}"}
+    return {**cookies_info(), "ok": True, "message": "Cookies salvos e testados: o YouTube liberou o download."}
+
+
+def delete_cookies():
+    COOKIES.unlink(missing_ok=True)
+
+
 def _video_id(text: str) -> str | None:
     m = re.search(r"(?:v=|youtu\.be/|shorts/|embed/)([\w-]{11})", text)
     return m.group(1) if m else None

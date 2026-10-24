@@ -286,8 +286,35 @@ async def preview(video_id: str):
     try:
         await run_in_threadpool(youtube.preview, video_id, dest)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"Falha na prévia: {e}")
+        raise HTTPException(502, f"Falha na prévia: {youtube.friendly_error(str(e))}")
     return FileResponse(dest, media_type="audio/mpeg")
+
+
+# ---------- Cookies do YouTube (servidor com IP de datacenter) ----------
+
+@app.get("/api/youtube/cookies")
+def youtube_cookies(request: Request):
+    if not is_host(request):
+        raise HTTPException(403)
+    return youtube.cookies_info()
+
+
+@app.post("/api/youtube/cookies")
+async def set_youtube_cookies(request: Request, body: dict = Body(...)):
+    if not is_host(request):
+        raise HTTPException(403, "Os cookies só podem ser mudados no notebook.")
+    try:
+        return await run_in_threadpool(youtube.save_cookies, str(body.get("text") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/youtube/cookies")
+def delete_youtube_cookies(request: Request):
+    if not is_host(request):
+        raise HTTPException(403)
+    youtube.delete_cookies()
+    return youtube.cookies_info()
 
 
 @app.post("/api/songs")

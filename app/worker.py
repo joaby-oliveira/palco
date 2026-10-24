@@ -158,7 +158,7 @@ def _loop():
                 store.remove(song_id)
         except Exception as e:  # noqa: BLE001 — qualquer falha vira mensagem na tela
             traceback.print_exc()
-            msg = str(e) or e.__class__.__name__
+            msg = youtube.friendly_error(str(e) or e.__class__.__name__)
             if not store.get(song_id):
                 pass
             elif backing_task:  # a música continua tocável; só avisa da falha

@@ -188,9 +188,12 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
 - `HTTPS_PORT=0` (já é o padrão da imagem): sem a porta 8443 com certificado
   próprio, porque o domínio já tem HTTPS.
 - YouTube bloqueando o download ("Sign in to confirm you're not a bot"),
-  comum em IP de datacenter: exporte os cookies do YouTube com a extensão
-  "Get cookies.txt LOCALLY" (de preferência numa conta secundária) e salve
-  como `data/youtube-cookies.txt`. Vale na hora, sem reiniciar.
+  comum em IP de datacenter: em **Ajustes do anfitrião › YouTube**, envie um
+  `cookies.txt` de uma conta (de preferência secundária). Para exportar: numa
+  janela anônima, entre no YouTube, exporte com a extensão "Get cookies.txt
+  LOCALLY" e feche a janela sem sair da conta. O app testa na hora se o
+  YouTube liberou. Os cookies vencem de tempos em tempos; quando o download
+  voltar a falhar, a mensagem de erro avisa para enviar de novo.
 
 ### Deploy automático e sem queda
 
