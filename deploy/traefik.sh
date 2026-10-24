@@ -1,7 +1,8 @@
 #!/bin/sh
 # Rota fixa do Palco no Traefik do Easypanel (provider de arquivo). Ela aponta para o alias
 # de rede palco-live, que o deploy passa do container antigo para o novo; o retry segura os
-# requests que caem bem na troca, então ninguém vê erro.
+# requests que caem bem na troca (o Traefik espalha as tentativas em ~1,5 × 25 × 300 ms ≈ 10 s),
+# então ninguém vê erro.
 DOMAIN=${DOMAIN:-palco.lavagest.website}
 FILE=/etc/easypanel/traefik/config/palco.yaml
 cat > $FILE.tmp <<YAML
@@ -22,8 +23,8 @@ http:
   middlewares:
     palco-retry:
       retry:
-        attempts: 10
-        initialInterval: 100ms
+        attempts: 25
+        initialInterval: 300ms
   services:
     palco:
       loadBalancer:
