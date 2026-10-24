@@ -191,3 +191,11 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
   comum em IP de datacenter: exporte os cookies do YouTube com a extensão
   "Get cookies.txt LOCALLY" (de preferência numa conta secundária) e salve
   como `data/youtube-cookies.txt`. Vale na hora, sem reiniciar.
+
+### Deploy automático
+
+No servidor, o `palco-autodeploy.timer` (systemd) confere o `main` do GitHub a
+cada minuto. Se tem commit novo, roda `/opt/palco-deploy.sh` (git pull, build
+da imagem e container novo) e confere se o site respondeu. Ou seja: `git push`
+e em até uns 3 minutos está no ar. Para acompanhar:
+`journalctl -u palco-autodeploy -f`.
