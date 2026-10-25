@@ -123,6 +123,38 @@ Abra o endereço do Palco no navegador da TV e use só as setas, o OK e o Voltar
 - No fim da música o foco já fica no botão do próximo cantor; ← vai para o
   **Bis!**.
 
+## Duelo
+
+Dois cantores, a mesma música: a letra vem dividida entre eles (cada um na
+sua cor, e o refrão dos dois juntos) e a galera vota no celular em quem está
+mandando melhor.
+
+- **No telão**: cartão **DUELO** (ou **Duelo** na ficha da música) › escolha a
+  música, o cantor A e o cantor B › **Pôr na fila** ou **Duelar agora**. Quem
+  está sem celular entra pelo campo **Alguém sem celular?**.
+- **No celular**: no repertório, o botão de duelo ao lado do **+** desafia
+  alguém da festa. O duelo entra na fila como qualquer pedido.
+- **No palco**: no topo aparece de quem é a vez (e quem vem depois, nos
+  trechos sem letra); embaixo do nome dos dois, o placar dos votos ao vivo. No
+  fim, o vencedor. **Bis!** repete o mesmo duelo.
+- **Votos**: um voto por pessoa (A ou B), dá para mudar até o fim. Os dois
+  cantores não votam.
+
+### Dividir as vozes
+
+Na primeira vez que uma música vai para um duelo, o app divide a letra
+sozinho. Com a voz separada e a letra sincronizada, ele mede o tom e o timbre
+de cada linha: se acha duas vozes bem diferentes (homem e mulher, por
+exemplo), cada uma vira um cantor. Senão (um cantor só, ou duas vozes
+parecidas), divide pelas estrofes: elas alternam e o refrão que mais se
+repete é dos dois.
+
+Para acertar à mão, na ficha da música, **Dividir as vozes**: cada linha tem
+**A**, **B** ou **Juntos**, e o ▶ toca a partir dela (só a voz, quando foi
+separada) para ouvir quem canta. **Dividir sozinho** refaz a sugestão
+automática. Depois de **Salvar divisão**, a música aparece com ★ na lista do
+duelo (pronta para duelo). Trocar a letra apaga a divisão.
+
 ## Modo dança
 
 Um "Just Dance" caseiro: o vídeo da coreografia toca na tela e a webcam do
@@ -184,7 +216,8 @@ mostra:
 ## Arquivos
 
 - `app/`: servidor (FastAPI). `party.py` é a festa (convidados, fila do palco,
-  votos, sons); `worker.py` é a fila de preparo; `providers/` os serviços.
+  votos, sons); `duel.py` divide a letra para o duelo; `worker.py` é a fila
+  de preparo; `providers/` os serviços.
 - `static/`: telão (`index.html`), palco (`player.html`), palco de dança
   (`dance.html`, nota em `dance-score.js`), celular (`mobile.html`) e os sons
   do telão (`fx.js`). `app/dance.py` prepara o gabarito da dança.

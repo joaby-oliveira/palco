@@ -135,16 +135,19 @@ class Room:
         self.id = rid
         self.token = token
         self.host_name: str = data.get("host_name") or "Anfitrião"
-        self.queue: list[dict] = data.get("queue", [])   # entradas: {id, song_id, client, host, added}
+        self.queue: list[dict] = data.get("queue", [])   # entradas: {id, song_id, client, host, added, duel?}
         self.current: dict | None = data.get("current")  # entrada que está no palco agora
         self.last: dict | None = data.get("last")        # última apresentação (tela de fim e votos atrasados)
         self.touched: float = data.get("touched") or time.time()
+        self.host_client: str = data.get("host_client", "")  # aparelho do telão (para chamar o anfitrião para um duelo)
+        self.offline: list[str] = data.get("offline", [])  # convidados sem celular, adicionados pelo telão
         self.online: dict[str, int] = {}                 # convidado -> conexões abertas
         self.fx_event: dict = {"seq": 0}                 # último efeito; o telão toca quando o seq muda
 
     def dump(self) -> dict:
         return {"token": self.token, "host_name": self.host_name, "queue": self.queue,
-                "current": self.current, "last": self.last, "touched": self.touched}
+                "current": self.current, "last": self.last, "touched": self.touched,
+                "host_client": self.host_client, "offline": self.offline}
 
     def _changed(self):
         self.touched = time.time()
@@ -163,6 +166,22 @@ class Room:
             return {"name": g["name"], "color": g["color"]}
         return {"name": self.host_name if is_host else "Alguém", "color": "#FFC93C" if is_host else "#B9ADD1"}
 
+    def seen_host(self, client: str):
+        if client and client != "anon" and client != self.host_client:
+            with _lock:
+                self.host_client = client
+                self._changed()
+
+    def add_offline(self, name: str) -> dict:
+        """Alguém sem celular (para entrar num duelo): ganha um convidado só desta sala."""
+        client = "sem-celular-" + uuid.uuid4().hex[:8]
+        g = set_guest(client, name)
+        with _lock:
+            self.offline.append(client)
+            self._changed()
+        store.touch()
+        return dict(g, client=client)
+
     def connected(self, client: str, delta: int):
         with _lock:
             self.online[client] = self.online.get(client, 0) + delta
@@ -172,17 +191,22 @@ class Room:
 
     # ---------- Fila do palco ----------
 
-    @staticmethod
-    def _entry(song_id: str, client: str, host: bool) -> dict:
-        return {"id": uuid.uuid4().hex[:8], "song_id": song_id, "client": client, "host": host, "added": time.time()}
+    def _entry(self, song_id: str, client: str, host: bool, rival: str | None = None) -> dict:
+        e = {"id": uuid.uuid4().hex[:8], "song_id": song_id, "client": client, "host": host, "added": time.time()}
+        if rival:
+            # Duelo: quem pediu é o cantor A, o rival é o B
+            if rival == client:
+                raise ValueError("Duelo é contra outra pessoa!")
+            e["duel"] = {"client": rival, "host": bool(self.host_client) and rival == self.host_client}
+        return e
 
-    def enqueue(self, song_id: str, client: str, host: bool) -> dict:
+    def enqueue(self, song_id: str, client: str, host: bool, rival: str | None = None) -> dict:
         with _lock:
-            # Mesma pessoa pedindo a mesma música duas vezes: fica uma só
+            # Mesma pessoa pedindo a mesma música (ou o mesmo duelo) duas vezes: fica uma só
             for e in self.queue:
-                if e["song_id"] == song_id and e["client"] == client:
+                if e["song_id"] == song_id and e["client"] == client and (e.get("duel") or {}).get("client") == rival:
                     return e
-            e = self._entry(song_id, client, host)
+            e = self._entry(song_id, client, host, rival)
             self.queue.append(e)
             self._changed()
         store.touch()
@@ -192,7 +216,7 @@ class Room:
         with _lock:
             for e in self.queue:
                 if e["id"] == entry_id:
-                    if not host and e["client"] != client:
+                    if not host and client not in (e["client"], (e.get("duel") or {}).get("client")):
                         raise PermissionError("Só dá para tirar os seus pedidos.")
                     self.queue.remove(e)
                     break
@@ -212,14 +236,15 @@ class Room:
             self._changed()
         store.touch()
 
-    def start(self, entry_id: str | None = None, song_id: str | None = None, client: str = "", host: bool = True) -> dict:
+    def start(self, entry_id: str | None = None, song_id: str | None = None, client: str = "", host: bool = True,
+              rival: str | None = None) -> dict:
         """Põe alguém no palco: uma entrada da fila, ou uma música direto (o anfitrião clicou em "Cantar agora")."""
         with _lock:
             e = next((x for x in self.queue if x["id"] == entry_id), None) if entry_id else None
             if e:
                 self.queue.remove(e)
             elif song_id:
-                e = self._entry(song_id, client, host)
+                e = self._entry(song_id, client, host, rival)
             else:
                 raise KeyError("Esse pedido não está mais na fila.")
             e = dict(e, started=time.time(), votes={})
@@ -236,16 +261,23 @@ class Room:
             self._changed()
         store.touch()
 
-    def vote(self, client: str, score: int):
+    def vote(self, client: str, score: int | None = None, pick: str | None = None):
+        """Nota de 0 a 100 para quem canta ou, num duelo, em quem está mandando melhor (pick "a" ou "b")."""
         with _lock:
             target = self.current
             if not target and self.last and time.time() - self.last["finished"] < VOTE_WINDOW:
                 target = self.last
             if not target:
                 raise LookupError("Ninguém está cantando agora.")
-            if target["client"] == client:
+            duel = target.get("duel")
+            if client == target["client"] or (duel and client == duel["client"]):
                 raise PermissionError("Votar em si mesmo não vale!")
-            target["votes"][client] = max(0, min(100, int(score)))
+            if duel:
+                if pick not in ("a", "b"):
+                    raise ValueError("Escolhe um dos dois.")
+                target["votes"][client] = pick
+            else:
+                target["votes"][client] = max(0, min(100, int(score or 0)))
             self._changed()
         store.touch()
 
@@ -254,7 +286,12 @@ class Room:
             return None
         out = {k: v for k, v in e.items() if k != "votes"}
         out["singer"] = self.singer(e["client"], e.get("host", False))
-        if "votes" in e:
+        if e.get("duel"):
+            votes = list(e.get("votes", {}).values())
+            out["rival"] = self.singer(e["duel"]["client"], e["duel"].get("host", False))
+            out["duel"] = {"client": e["duel"]["client"], "a": votes.count("a"), "b": votes.count("b")}
+            out["vote_count"] = len(votes)
+        elif "votes" in e:
             votes = list(e["votes"].values())
             out["vote_count"] = len(votes)
             out["score"] = round(sum(votes) / len(votes)) if votes else None
@@ -275,8 +312,22 @@ class Room:
                 "last_votable": bool(last and time.time() - last["finished"] < VOTE_WINDOW),
                 "my_vote": mine_vote,
                 "online": len(self.online),
+                "people": self._people(),
                 "me": _guests.get(client),
             }
+
+    def _people(self) -> list[dict]:
+        """Quem dá para chamar para um duelo: o anfitrião, quem está online e quem está na fila."""
+        out, seen = [], set()
+        if self.host_client:
+            out.append(dict(self.singer(self.host_client, True), client=self.host_client, host=True))
+            seen.add(self.host_client)
+        queued = [c for e in self.queue for c in (e["client"], (e.get("duel") or {}).get("client"))]
+        for c in list(self.online) + self.offline + queued:
+            if c not in seen and c in _guests:
+                seen.add(c)
+                out.append(dict(self.singer(c), client=c))
+        return out
 
     # ---------- Efeitos sonoros ----------
 
@@ -294,7 +345,7 @@ class Room:
 def empty_snapshot(client: str) -> dict:
     """Sem sala (celular que não veio pelo QR): nada de fila, só quem é a pessoa."""
     return {"queue": [], "current": None, "last": None, "last_votable": False, "my_vote": None,
-            "online": 0, "me": _guests.get(client)}
+            "online": 0, "people": [], "me": _guests.get(client)}
 
 
 # ---------- Sons (de todas as salas) ----------

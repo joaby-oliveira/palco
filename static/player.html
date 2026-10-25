@@ -7,8 +7,8 @@
 <link rel="icon" href="/static/disco.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=5">
-<link rel="stylesheet" href="/static/player.css?v=4">
+<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/player.css?v=5">
 </head>
 <body>
 <div id="stage">
@@ -21,6 +21,10 @@
     <span class="label">NO MICROFONE</span>
     <span class="who" id="singer-who"></span>
     <span class="song" id="song-title"></span>
+    <div class="duel-score" id="duel-score" hidden>
+      <div class="duel-bar"><div id="duel-fill"></div></div>
+      <div class="duel-nums"><span id="duel-va"></span><span class="k">votos da galera</span><span id="duel-vb"></span></div>
+    </div>
   </div>
   <div class="singer" id="song-only" hidden>
     <span class="label">TOCANDO</span>
@@ -31,6 +35,8 @@
     <span class="txt"><span class="k" id="up-next-k">Pede a sua</span><span class="v" id="up-next-v">Escaneia o QR</span></span>
     <span class="qr"><img data-qr alt="QR code para pedir música"></span>
   </div>
+
+  <div class="duel-turn" id="duel-turn" hidden aria-live="polite"></div>
 
   <div id="lyrics-box" data-tv-noscroll>
     <div id="lyrics-scroll"><div id="lyrics-lines"></div></div>
@@ -116,9 +122,9 @@
       <h1 id="final-title"></h1>
       <span class="final-song" id="final-song"></span>
       <div class="thermo">
-        <div class="thermo-head"><span>Termômetro da galera</span><span id="final-votes"></span></div>
+        <div class="thermo-head"><span id="thermo-k">Termômetro da galera</span><span id="final-votes"></span></div>
         <div class="thermo-bar"><div id="final-fill"><span id="final-score"></span></div></div>
-        <div class="thermo-foot"><span>Desafinou feio</span><span>Pede bis!</span></div>
+        <div class="thermo-foot"><span id="thermo-l">Desafinou feio</span><span id="thermo-r">Pede bis!</span></div>
       </div>
     </div>
     <div class="final-actions">
@@ -127,9 +133,9 @@
     </div>
   </div>
 </div>
-<script src="/static/common.js?v=5"></script>
+<script src="/static/common.js?v=6"></script>
 <script src="/static/tvnav.js?v=1"></script>
 <script src="/static/fx.js?v=3"></script>
-<script src="/static/player.js?v=5"></script>
+<script src="/static/player.js?v=6"></script>
 </body>
 </html>

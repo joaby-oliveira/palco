@@ -122,4 +122,6 @@ def write_lyrics(song_id: str, payload: dict):
     d = song_dir(song_id)
     d.mkdir(parents=True, exist_ok=True)
     (d / "lyrics.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    update(song_id, has_lyrics=bool(payload["lines"]), lyrics_synced=payload["synced"])
+    # duel: como a letra está dividida para o modo duelo (manual, voz, estrofes ou None)
+    update(song_id, has_lyrics=bool(payload["lines"]), lyrics_synced=payload["synced"],
+           duel=payload.get("parts_source") if payload.get("parts") else None)

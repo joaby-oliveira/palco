@@ -13,6 +13,7 @@ let synced = false;
 let offset = 0;     // ajuste de sincronia desta música (s); positivo = letra mais tarde
 let btDelay = 0;    // atraso da caixa Bluetooth (s), vale para todas as músicas
 let STATE = null;
+let parts = null;   // duelo: quem canta cada linha ("a", "b", "ab" ou null)
 
 // ---------- Áudio ----------
 
@@ -112,7 +113,8 @@ function renderLyrics() {
   // No modo "escolher a linha certa", cada linha vira um botão para o controle remoto
   const pick = syncMode && synced;
   lines.forEach((l, i) => {
-    box.append(h("div", { class: "ln" + (l.text ? "" : " empty"), "data-i": i, onclick: () => syncToLine(i),
+    const part = parts && l.text && parts[i] ? ` p${parts[i]}` : "";
+    box.append(h("div", { class: "ln" + (l.text ? "" : " empty") + part, "data-i": i, onclick: () => syncToLine(i),
       tabindex: pick && l.t != null ? "0" : null, role: pick ? "button" : null }, h("span", { class: "fill" }, l.text || "♪")));
   });
 }
@@ -146,6 +148,7 @@ function updateLyrics() {
   const key = rec ? `${idx}/${rec.idx}` : idx;
   if (key === activeIdx) return;
   activeIdx = key;
+  if (parts) renderTurn(idx);
   for (let i = 0; i < els.length; i++) {
     els[i].classList.toggle("on", i === idx);
     els[i].classList.toggle("past", i < idx);
@@ -454,13 +457,64 @@ function renderParty() {
   if (e) {
     $("singer-box").hidden = false;
     $("song-only").hidden = true;
-    $("singer-who").replaceChildren(avatar(e.singer, "lg"), e.singer.name.toUpperCase());
+    $("singer-box").querySelector(".label").textContent = e.rival ? "DUELO" : "NO MICROFONE";
+    $("singer-who").replaceChildren(...(e.rival
+      ? [avatar(e.singer, "lg"), h("span", { class: "vs-a" }, e.singer.name.toUpperCase()), h("span", { class: "vs" }, "×"), h("span", { class: "vs-b" }, e.rival.name.toUpperCase()), avatar(e.rival, "lg")]
+      : [avatar(e.singer, "lg"), e.singer.name.toUpperCase()]));
+    if (e.rival) renderDuelScore(e);
   }
   const n = nextEntry();
   const songs = BY_ID();
-  $("up-next-k").textContent = n ? "Depois vem" : "Pede a sua";
-  $("up-next-v").textContent = n ? `${n.singer.name} · ${songs[n.song_id].title}` : "Escaneia o QR";
+  $("up-next-k").textContent = n ? (n.rival ? "Depois vem o duelo" : "Depois vem") : "Pede a sua";
+  $("up-next-v").textContent = n ? `${entryName(n)} · ${songs[n.song_id].title}` : "Escaneia o QR";
   if (!$("final").hidden) renderFinal();
+}
+
+// ---------- Duelo ----------
+
+async function setupDuel(e) {
+  const c = duelColors(e);
+  stage.style.setProperty("--duel-a", c.a);
+  stage.style.setProperty("--duel-b", c.b);
+  stage.classList.add("duel");
+  try {
+    const res = await api(`/api/songs/${SONG_ID}/duel`);
+    if (res.parts.length === lines.length) parts = res.parts;
+  } catch (err) { toast(`Duelo sem divisão da letra: ${err.message}`, true); }
+  renderLyrics();
+  activeIdx = -2;
+}
+
+// Quem canta agora (ou quem vem, no trecho sem letra)
+function renderTurn(idx) {
+  const e = myEntry();
+  if (!e || !e.rival) return;
+  let i = idx;
+  if (i < 0 || !lines[i].text || !parts[i]) i = lines.findIndex((l, k) => k > idx && l.text && parts[k]);
+  const p = i >= 0 ? parts[i] : null;
+  const box = $("duel-turn");
+  box.hidden = !p;
+  if (!p) return;
+  const soon = i !== idx;
+  box.className = `duel-turn t${p}`;
+  if (p === "ab") box.replaceChildren(h("span", { class: "k" }, soon ? "Agora vem" : "Agora"), "OS DOIS JUNTOS");
+  else {
+    const who = p === "a" ? e.singer : e.rival;
+    box.replaceChildren(avatar(who), h("span", { class: "k" }, soon ? "Prepara" : "Vez de"), who.name.toUpperCase());
+  }
+}
+
+function duelTally(e) {
+  const a = e.duel.a, b = e.duel.b;
+  return { a, b, total: a + b, pctA: a + b ? Math.round((a / (a + b)) * 100) : 50 };
+}
+
+function renderDuelScore(e) {
+  const t = duelTally(e);
+  $("duel-score").hidden = false;
+  $("duel-fill").style.width = `${t.pctA}%`;
+  $("duel-va").textContent = t.a;
+  $("duel-vb").textContent = t.b;
 }
 
 watchState((s) => {
@@ -489,6 +543,27 @@ function verdict(score) {
 
 function renderFinal() {
   const e = myEntry();
+  if (e && e.rival) renderDuelFinal(e); else renderSoloFinal(e);
+  renderFinalNext();
+}
+
+function renderDuelFinal(e) {
+  const t = duelTally(e);
+  const c = duelColors(e);
+  const win = t.a === t.b ? null : t.a > t.b ? e.singer : e.rival;
+  $("final-title").textContent = win ? `${win.name.toUpperCase()} VENCEU O DUELO!` : t.total ? "EMPATE!" : "QUE DUELO!";
+  $("final-song").textContent = `${song.title} · ${song.artist}`;
+  $("thermo-k").textContent = "Votos da galera";
+  $("final-votes").textContent = t.total ? `${t.a} × ${t.b}` : "Vota pelo celular!";
+  $("final-fill").style.width = `${t.pctA}%`;
+  $("final-fill").style.background = c.a;
+  $("final-fill").parentElement.style.background = c.b;
+  $("final-score").textContent = t.total ? `${t.pctA}%` : "";
+  $("thermo-l").textContent = e.singer.name;
+  $("thermo-r").textContent = e.rival.name;
+}
+
+function renderSoloFinal(e) {
   const name = e ? e.singer.name.toUpperCase() : "";
   const score = e ? e.score : null;
   $("final-title").textContent = name ? `${verdict(score)}, ${name}!` : `${verdict(score)}!`;
@@ -497,10 +572,13 @@ function renderFinal() {
   $("final-votes").textContent = votes ? `${votes} ${votes === 1 ? "voto" : "votos"}` : "Vota pelo celular!";
   $("final-fill").style.width = score == null ? "0" : `${Math.max(8, score)}%`;
   $("final-score").textContent = score == null ? "" : score;
+}
+
+function renderFinalNext() {
   const n = nextEntry();
   const songs = BY_ID();
   const btn = $("final-next");
-  btn.replaceChildren(n ? `Agora é ${n.singer.name} · ${songs[n.song_id].title}` : "Voltar pro início");
+  btn.replaceChildren(n ? `Agora ${n.rival ? "é o duelo" : "é"} ${entryName(n)} · ${songs[n.song_id].title}` : "Voltar pro início");
   if (n && finalCount > 0) btn.append(h("span", { class: "count" }, finalCount));
   btn.onclick = async () => {
     clearInterval(finalTimer);
@@ -552,7 +630,7 @@ $("final-bis").addEventListener("click", async () => {
   // Bis: a mesma pessoa canta de novo
   const e = myEntry();
   try {
-    const entry = await api("/api/stage/start", { method: "POST", body: { song_id: SONG_ID, client: e ? e.client : undefined } });
+    const entry = await api("/api/stage/start", { method: "POST", body: { song_id: SONG_ID, client: e ? e.client : undefined, rival: e && e.rival ? e.duel.client : undefined } });
     history.replaceState(null, "", `/play/${SONG_ID}?entry=${entry.id}`);
     location.reload();
   } catch (err) { toast(err.message, true); }
@@ -595,6 +673,8 @@ async function init() {
   lines = lyr.lines || [];
   synced = Boolean(lyr.synced);
   renderLyrics();
+  const entry = myEntry();
+  if (entry && entry.rival) await setupDuel(entry);
 
   const names = song.separated ? ["instrumental", "lead"].concat(song.has_backing ? ["backing"] : []) : ["original"];
   try { await Promise.all(names.map(loadTrack)); }

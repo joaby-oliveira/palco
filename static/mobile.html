@@ -8,8 +8,8 @@
 <link rel="icon" href="/static/disco.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=5">
-<link rel="stylesheet" href="/static/mobile.css?v=4">
+<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/mobile.css?v=5">
 </head>
 <body>
 <!-- Primeira vez: como a galera te chama -->
@@ -34,6 +34,17 @@
     <button class="btn big" type="submit">ENTRAR</button>
     <p class="sub" style="margin:0;text-align:center" id="join-hint">Ou aponta a câmera para o QR do telão.</p>
   </form>
+</div>
+
+<!-- Desafiar alguém para um duelo -->
+<div class="sheet" id="challenge" hidden role="dialog" aria-modal="true" aria-labelledby="challenge-title">
+  <div class="sheet-body">
+    <div class="display" id="challenge-title" style="font-size:20px">DUELO</div>
+    <div class="sub" id="challenge-song"></div>
+    <div class="sub" style="margin-top:10px">Contra quem?</div>
+    <ul class="queue-list" id="challenge-people"></ul>
+    <button class="btn ghost" type="button" id="challenge-close">Cancelar</button>
+  </div>
 </div>
 
 <main class="m-wrap" id="app">
@@ -90,7 +101,7 @@
   <button data-tab="efeitos"><i data-icon="pads" data-size="22"></i>Efeitos</button>
 </nav>
 
-<script src="/static/common.js?v=5"></script>
-<script src="/static/mobile.js?v=4"></script>
+<script src="/static/common.js?v=6"></script>
+<script src="/static/mobile.js?v=5"></script>
 </body>
 </html>

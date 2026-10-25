@@ -92,11 +92,11 @@
           <span class="name">MESA DE EFEITOS</span>
           <span class="desc">Aplausos, buzina, risada de auditório. No celular também.</span>
         </button>
-        <div class="mode soon">
+        <button type="button" class="mode" id="open-duel">
           <i data-icon="duel" data-size="34"></i>
           <span class="name">DUELO</span>
-          <span class="desc">Em breve · dois cantores, a galera vota</span>
-        </div>
+          <span class="desc">Dois cantores dividem a música e a galera vota em quem mandou melhor</span>
+        </button>
         <button type="button" class="mode" id="open-dance">
           <i data-icon="dance" data-size="34"></i>
           <span class="name">DANÇA</span>
@@ -139,6 +139,26 @@
     </form>
   </div>
 
+  <!-- Dividir as vozes para o duelo -->
+  <div id="view-duel" hidden style="display:flex;flex-direction:column;gap:20px">
+    <button type="button" class="back" data-back><i data-icon="back" data-size="18"></i>voltar</button>
+    <h1 class="display" id="duel-song-title" style="margin:0;font-size:34px"></h1>
+    <div class="card">
+      <h2 class="h-section" style="margin-bottom:8px">QUEM CANTA CADA LINHA</h2>
+      <p class="sub" style="margin-top:0">Toque em <b>A</b>, <b>B</b> ou <b>Juntos</b> em cada linha. O <b>▶</b> toca a música a partir da linha (só a voz, quando ela foi separada) para você ouvir quem canta.</p>
+      <p class="hint" id="duel-note" style="font-size:14px"></p>
+      <div class="duel-tools">
+        <button class="btn ghost sm" type="button" id="duel-detect"><i data-icon="wand" data-size="16"></i>Dividir sozinho</button>
+        <button class="btn ghost sm" type="button" id="duel-stop" hidden><i data-icon="stop" data-size="16"></i>Parar</button>
+        <span class="grow"></span>
+        <span class="sub" id="duel-count"></span>
+        <button class="btn sm" type="button" id="duel-save">Salvar divisão</button>
+      </div>
+      <ol class="duel-lines" id="duel-lines"></ol>
+      <audio id="duel-audio" preload="none"></audio>
+    </div>
+  </div>
+
   <!-- Escolher capa -->
   <div id="view-cover" hidden style="display:flex;flex-direction:column;gap:20px">
     <button type="button" class="back" data-back><i data-icon="back" data-size="18"></i>voltar</button>
@@ -158,6 +178,27 @@
 <dialog id="song-dlg">
   <div class="dlg-head"><h3>MÚSICA</h3><button class="icon-btn sm" data-close aria-label="Fechar"><i data-icon="x" data-size="18"></i></button></div>
   <div class="dlg-body" id="song-body"></div>
+</dialog>
+
+<!-- Duelo: música e os dois cantores -->
+<dialog id="duel-dlg">
+  <div class="dlg-head"><h3>DUELO</h3><button class="icon-btn sm" data-close aria-label="Fechar"><i data-icon="x" data-size="18"></i></button></div>
+  <div class="dlg-body">
+    <p class="sub" style="margin-top:0">Os dois cantam a mesma música, cada um com a sua parte da letra (na cor dele). A galera vota no celular em quem está mandando melhor.</p>
+    <label class="field"><span>Música</span><select id="duel-song"></select></label>
+    <div class="hint" id="duel-split" style="margin:-6px 0 14px"></div>
+    <div class="field"><span>Cantor A</span><div class="duel-people" id="duel-a"></div></div>
+    <div class="field"><span>Cantor B</span><div class="duel-people" id="duel-b"></div></div>
+    <form class="row duel-add" id="duel-add">
+      <input type="text" id="duel-add-name" maxlength="24" placeholder="Alguém sem celular? Escreve o nome" aria-label="Nome de quem está sem celular">
+      <button class="btn ghost sm" type="submit">Adicionar</button>
+    </form>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn ghost" data-close>Cancelar</button>
+    <button class="btn pink" id="duel-queue">Pôr na fila</button>
+    <button class="btn" id="duel-now">Duelar agora</button>
+  </div>
 </dialog>
 
 <!-- Mesa de efeitos -->

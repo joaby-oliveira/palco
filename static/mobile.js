@@ -62,10 +62,12 @@ watchState((s) => {
   renderMyTurn();
   renderQueue();
   renderLibrary();
+  if (!$("challenge").hidden) renderChallenge();
   renderSoundBoard($("sounds"), s.fx, { preview: true });
 });
 
-const mine = (e) => e.client === CLIENT;
+// Pedido meu: eu canto, sozinho ou num duelo
+const mine = (e) => e.client === CLIENT || Boolean(e.duel && e.duel.client === CLIENT);
 
 // ---------- Agora no palco + voto ----------
 
@@ -79,9 +81,10 @@ function renderNow() {
   const s = BY_ID[e.song_id];
   const live = Boolean(p.current);
   box.hidden = false;
-  const head = h("div", { class: "head" }, avatar(e.singer),
-    h("div", {}, h("div", { class: "k" }, live ? "No palco agora" : "Acabou de cantar"),
-      h("div", { class: "who" }, `${e.singer.name}${s ? " · " + s.title : ""}`)));
+  const head = h("div", { class: "head" }, entryAvatars(e),
+    h("div", {}, h("div", { class: "k" }, e.rival ? (live ? "Duelo no palco" : "Acabou o duelo") : live ? "No palco agora" : "Acabou de cantar"),
+      h("div", { class: "who" }, `${entryName(e)}${s ? " · " + s.title : ""}`)));
+  if (e.rival) { box.replaceChildren(head, ...duelVote(e, live)); return; }
   if (mine(e) || (!live && !p.last_votable)) {
     if (!mine(e)) { box.replaceChildren(head, h("div", { class: "sub" }, e.score == null ? "Ninguém votou dessa vez." : `A galera deu ${e.score}.`)); return; }
     box.replaceChildren(head, h("div", { class: "sub" }, live ? "É você! Solta a voz." : `A galera te deu ${e.score ?? "—"}${e.vote_count ? ` (${e.vote_count} votos)` : ""}.`));
@@ -96,6 +99,24 @@ function renderNow() {
     }, label))));
 }
 
+function duelVote(e, live) {
+  const p = STATE.party;
+  const { a, b } = e.duel;
+  const c = duelColors(e);
+  if (mine(e) || (!live && !p.last_votable)) {
+    const win = a === b ? null : a > b ? e.singer : e.rival;
+    const result = !a && !b ? "Ninguém votou dessa vez." : win ? `${win.name} venceu: ${Math.max(a, b)} × ${Math.min(a, b)}.` : `Empate: ${a} × ${b}.`;
+    return [h("div", { class: "sub" }, live ? "É duelo! Canta a sua parte (na sua cor) e capricha." : result)];
+  }
+  return [
+    h("div", { class: "sub" }, p.my_vote == null ? "Quem está mandando melhor?" : "Valeu! Dá para mudar o voto até o fim."),
+    h("div", { class: "duel-votes" }, ...[["a", e.singer, c.a, a], ["b", e.rival, c.b, b]].map(([pick, who, color, n]) => h("button", {
+      class: p.my_vote === pick ? "on" : "", style: `--c:${color}`, "aria-pressed": p.my_vote === pick,
+      onclick: () => api("/api/vote", { method: "POST", body: { pick } }).catch((err) => toast(err.message, true)),
+    }, avatar(who), h("span", { class: "nm" }, who.name), h("span", { class: "n" }, n)))),
+  ];
+}
+
 function renderMyTurn() {
   const q = STATE.party.queue;
   const i = q.findIndex(mine);
@@ -106,7 +127,7 @@ function renderMyTurn() {
   box.hidden = false;
   box.replaceChildren(h("span", { class: "pos" }, `${i + 1}º`),
     h("span", {}, h("b", {}, i === 0 ? "Você é o próximo!" : `Você é o ${i + 1}º da fila`),
-      `${s ? s.title : ""}${st.busy ? ` · tá ficando pronta (${Math.round((s.progress || 0) * 100)}%)` : st.tone === "err" ? " · deu ruim no preparo" : ""}`));
+      `${q[i].rival ? `Duelo ${entryName(q[i])} · ` : ""}${s ? s.title : ""}${st.busy ? ` · tá ficando pronta (${Math.round((s.progress || 0) * 100)}%)` : st.tone === "err" ? " · deu ruim no preparo" : ""}`));
 }
 
 // ---------- Fila ----------
@@ -121,8 +142,8 @@ function renderQueue() {
     const st = s ? songStatus(s) : { tone: "err", label: "Sumiu" };
     list.append(h("li", { class: "q-item" + (mine(e) ? " mine" : "") },
       h("span", { class: "n" }, i + 1),
-      avatar(e.singer),
-      h("span", { class: "meta" }, h("span", { class: "t" }, s ? s.title : "?"), h("span", { class: "s" }, `${e.singer.name}${st.busy || st.tone === "err" ? " · " + st.label : ""}`)),
+      entryAvatars(e),
+      h("span", { class: "meta" }, h("span", { class: "t" }, s ? s.title : "?"), h("span", { class: "s" }, `${e.rival ? "Duelo: " : ""}${entryName(e)}${st.busy || st.tone === "err" ? " · " + st.label : ""}`)),
       mine(e) ? h("button", { class: "x", "aria-label": "Tirar meu pedido", title: "Tirar meu pedido", onclick: () => api(`/api/stage/${e.id}`, { method: "DELETE" }).catch((err) => toast(err.message, true)) }, icon("x", 16)) : null));
   });
 }
@@ -146,11 +167,42 @@ function renderLibrary() {
     box.append(h("li", { class: "q-item lib-row" },
       h("img", { src: s.cover, alt: "", loading: "lazy" }),
       h("span", { class: "meta" }, h("span", { class: "t" }, s.title), h("span", { class: "s" }, s.artist)),
+      s.kind !== "dance" && s.has_lyrics ? h("button", { class: "x", "aria-label": `Duelar com ${s.title}`, title: "Desafiar alguém para um duelo", onclick: () => openChallenge(s) }, icon("duel", 18)) : null,
       h("button", { class: "x", "aria-label": `Cantar ${s.title}`, title: "Entrar na fila com essa", onclick: async () => {
         try { await api("/api/stage", { method: "POST", body: { song_id: s.id } }); toast("Pedido feito!"); } catch (err) { toast(err.message, true); }
       } }, icon("plus", 18))));
   }
 }
+
+// ---------- Duelo: desafiar alguém ----------
+
+let challengeSong = null;
+
+function openChallenge(s) {
+  if (!STATE.party.me) { askName(); return; }
+  challengeSong = s;
+  $("challenge-song").textContent = `${s.title} · ${s.artist}${s.duel === "manual" ? " · pronta para duelo" : ""}`;
+  renderChallenge();
+  $("challenge").hidden = false;
+}
+
+function renderChallenge() {
+  const people = (STATE.party.people || []).filter((p) => p.client !== CLIENT);
+  const list = $("challenge-people");
+  list.replaceChildren();
+  if (!people.length) { list.append(h("li", { class: "empty" }, "Ninguém mais na festa ainda. Chama a galera!")); return; }
+  for (const p of people) {
+    list.append(h("li", {}, h("button", { class: "q-item person", type: "button", onclick: async () => {
+      try {
+        await api("/api/stage", { method: "POST", body: { song_id: challengeSong.id, rival: p.client } });
+        $("challenge").hidden = true;
+        toast(`Duelo contra ${p.name} na fila!`);
+      } catch (err) { toast(err.message, true); }
+    } }, avatar(p), h("span", { class: "meta" }, h("span", { class: "t" }, p.name), p.host ? h("span", { class: "s" }, "Anfitrião") : null))));
+  }
+}
+$("challenge-close").addEventListener("click", () => { $("challenge").hidden = true; });
+$("challenge").addEventListener("click", (e) => { if (e.target === $("challenge")) $("challenge").hidden = true; });
 
 // ---------- Efeitos ----------
 

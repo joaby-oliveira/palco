@@ -438,7 +438,7 @@ function renderParty() {
   const n = nextEntry();
   const songs = BY_ID();
   $("up-next-k").textContent = n ? "Depois vem" : "Pede a sua";
-  $("up-next-v").textContent = n ? `${n.singer.name} · ${songs[n.song_id].title}` : "Escaneia o QR";
+  $("up-next-v").textContent = n ? `${entryName(n)} · ${songs[n.song_id].title}` : "Escaneia o QR";
   if (!$("final").hidden) renderFinal();
 }
 
@@ -482,7 +482,7 @@ function renderFinal() {
   const n = nextEntry();
   const songs = BY_ID();
   const btn = $("final-next");
-  btn.replaceChildren(n ? `Agora é ${n.singer.name} · ${songs[n.song_id].title}` : "Voltar pro início");
+  btn.replaceChildren(n ? `Agora é ${entryName(n)} · ${songs[n.song_id].title}` : "Voltar pro início");
   if (n && finalCount > 0) btn.append(h("span", { class: "count" }, finalCount));
   btn.onclick = async () => {
     clearInterval(finalTimer);

@@ -35,7 +35,7 @@ html, body { height: 100%; overflow: hidden; }
 .ln.empty { min-height: 1.3em; }
 .ln.past { opacity: calc(var(--dim) * .55); }
 .ln.on { opacity: 1; font-family: var(--display); font-weight: 400; font-size: clamp(36px, 4.4vw, 64px); line-height: 1.12; text-shadow: none; }
-.ln.on .fill { background: linear-gradient(90deg, var(--gold) calc(var(--p, 0) * 100%), var(--text) calc(var(--p, 0) * 100%)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 24px rgba(0,0,0,.6)); }
+.ln.on .fill { background: linear-gradient(90deg, var(--sung, var(--gold)) calc(var(--p, 0) * 100%), var(--text) calc(var(--p, 0) * 100%)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 24px rgba(0,0,0,.6)); }
 .syncing .ln { cursor: pointer; }
 .syncing .ln:hover { outline: 2px dashed rgba(255,255,255,.4); border-radius: 10px; }
 .kbd-nav .ln:focus { outline: 3px solid var(--gold); outline-offset: 6px; border-radius: 10px; box-shadow: none; opacity: 1; }
@@ -111,11 +111,34 @@ html, body { height: 100%; overflow: hidden; }
 .final .big-ghost { font-size: 18px; padding: 16px 28px; background: var(--surface); }
 .final #final-next .count { width: 40px; height: 40px; border-radius: 50%; background: var(--gold-ink); color: var(--gold); display: grid; place-items: center; font-size: 17px; margin-right: -14px; }
 
+/* Duelo: cada cantor com a sua cor na letra, de quem é a vez e o placar dos votos */
+.duel .ln.pa { color: var(--duel-a); --sung: var(--duel-a); }
+.duel .ln.pb { color: var(--duel-b); --sung: var(--duel-b); }
+.duel .ln.pab::before { content: ""; display: inline-block; width: .45em; height: .45em; border-radius: 50%; margin-right: .4em; vertical-align: middle; background: linear-gradient(90deg, var(--duel-a) 50%, var(--duel-b) 50%); }
+.duel .ln.on.pab::before { width: .35em; height: .35em; }
+.duel #lyrics-box { top: 200px; }
+.duel .singer .who { font-size: clamp(22px, 2.6vw, 38px); flex-wrap: wrap; gap: 10px; }
+.singer .vs { color: var(--muted); }
+.singer .vs-a { color: var(--duel-a); }
+.singer .vs-b { color: var(--duel-b); }
+.duel-score { display: flex; flex-direction: column; gap: 4px; width: min(320px, 30vw); margin-top: 6px; }
+.duel-bar { height: 12px; border-radius: 6px; background: var(--duel-b); overflow: hidden; }
+.duel-bar > div { height: 100%; width: 50%; background: var(--duel-a); transition: width .8s cubic-bezier(.2,.7,.3,1); }
+.duel-nums { display: flex; justify-content: space-between; font-family: var(--display); font-size: 16px; }
+.duel-nums .k { font-family: var(--body); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); align-self: center; }
+.duel-turn { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 12px; padding: 8px 22px 8px 8px; border-radius: 999px; background: rgba(17,10,28,.8); border: 3px solid var(--gold); font-family: var(--display); font-size: clamp(18px, 2vw, 28px); white-space: nowrap; max-width: 30vw; overflow: hidden; }
+.duel-turn .k { font-family: var(--body); font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.duel-turn.ta { border-color: var(--duel-a); color: var(--duel-a); }
+.duel-turn.tb { border-color: var(--duel-b); color: var(--duel-b); }
+.duel-turn.tab { padding-left: 22px; border-color: transparent; background: linear-gradient(rgba(17,10,28,.92), rgba(17,10,28,.92)) padding-box, linear-gradient(90deg, var(--duel-a), var(--duel-b)) border-box; }
+
 @media (max-width: 900px) {
   .fx-rail { display: none; }
   #lyrics-box { right: 6vw; top: 190px; bottom: 190px; }
   .countdown { right: 0; }
   .up-next { display: none; }
   .singer { max-width: none; right: 40px; }
+  .duel-turn { top: auto; bottom: 150px; max-width: 80vw; }
+  .duel-score { width: 100%; }
   #controls { padding: 40px 16px 16px; }
 }

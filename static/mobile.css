@@ -39,3 +39,18 @@ body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 .lib-row img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; }
 .pads .pad { font-size: 14px; }
 .room-code { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: 2px; color: var(--muted); margin-left: 6px; vertical-align: 3px; }
+
+/* Duelo */
+.duel-votes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.duel-votes button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px; border-radius: 18px; border: 2px solid var(--c); background: var(--surface-2); color: var(--text); font-weight: 800; font-size: 16px; cursor: pointer; min-width: 0; }
+.duel-votes button.on { background: var(--c); color: var(--bg); }
+.duel-votes button.on .avatar { box-shadow: 0 0 0 3px var(--bg); }
+.duel-votes .nm { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.duel-votes .n { font-family: var(--display); font-weight: 400; font-size: 22px; line-height: 1; }
+.lib-row .x + .x { margin-left: -4px; }
+.lib-row .x:not(:last-child) { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.sheet { position: fixed; inset: 0; z-index: 30; background: rgba(8,4,14,.75); display: flex; align-items: flex-end; justify-content: center; }
+.sheet-body { width: 100%; max-width: 520px; max-height: 80vh; overflow: auto; background: var(--surface); border-radius: 24px 24px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+.sheet .queue-list { margin: 6px 0 10px; }
+.q-item.person { width: 100%; border: 0; color: var(--text); text-align: left; cursor: pointer; font: inherit; }
+.duo .avatar + .avatar { box-shadow: 0 0 0 3px var(--surface); }

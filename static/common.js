@@ -270,6 +270,20 @@ function avatar(singer, cls = "") {
   return h("span", { class: `avatar ${cls}`, style: `background:${(singer && singer.color) || "#FFC93C"}`, "aria-hidden": "true" }, name.trim()[0].toUpperCase());
 }
 
+// Pedido da fila: um cantor, ou os dois de um duelo ("Ana × Bia")
+function entryName(e) { return e.rival ? `${e.singer.name} × ${e.rival.name}` : e.singer.name; }
+function entryAvatars(e, cls = "") {
+  return e.rival ? h("span", { class: "duo" }, avatar(e.singer, cls), avatar(e.rival, cls)) : avatar(e.singer, cls);
+}
+
+// Os dois do duelo com a mesma cor ficariam iguais na letra: o B troca de cor
+function duelColors(e) {
+  const a = e.singer.color || "#FFC93C";
+  let b = e.rival.color || "#FF4FA3";
+  if (b.toLowerCase() === a.toLowerCase()) b = a.toLowerCase() === "#ff4fa3" ? "#7FB2FF" : "#FF4FA3";
+  return { a, b };
+}
+
 // Um único status por música: pronta, preparando ou precisa de ajuste
 function songStatus(s) {
   if (s.status === "error") return { tone: "err", label: "Deu ruim no preparo" };

@@ -15,7 +15,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import camlink, config, dance, metadata, party, providers, store, usage, worker, youtube
+from . import camlink, config, dance, duel, metadata, party, providers, store, usage, worker, youtube
 
 STATIC = config.ROOT / "static"
 STEMS = {"original", "instrumental", "lead", "backing"}
@@ -236,6 +236,15 @@ def patch_room(request: Request, body: dict = Body(...)):
     return {"id": room.id, "host_name": room.host_name}
 
 
+@app.post("/api/room/people")
+def add_person(request: Request, body: dict = Body(...)):
+    """O telão põe na festa alguém sem celular (para chamar para um duelo)."""
+    try:
+        return need_host(request).add_offline(str(body.get("name", "")))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/api/state")
 def get_state(request: Request):
     room, host = room_of(request)
@@ -251,6 +260,8 @@ async def ws(socket_: WebSocket):
     # Quem conta como "na festa" são os celulares; o telão não entra na conta
     if room and not host:
         room.connected(client, 1)
+    elif room:
+        room.seen_host(client)
     seen, fx_seen = -1, room.fx_event["seq"] if room else 0
     try:
         while True:
@@ -444,12 +455,17 @@ def set_me(request: Request, body: dict = Body(...)):
 
 @app.post("/api/stage")
 def stage_add(request: Request, body: dict = Body(...)):
-    """Entra na fila para cantar uma música da biblioteca."""
+    """Entra na fila para cantar uma música da biblioteca. Com rival, é um duelo;
+    o telão do anfitrião também escolhe quem é o cantor A (client)."""
     _song_or_404(str(body.get("song_id")))
     room, host = room_of(request)
     if not room:
         need_room(request)
-    return room.enqueue(body["song_id"], client_id(request), host)
+    client = (host and body.get("client")) or client_id(request)
+    try:
+        return room.enqueue(body["song_id"], client, host and client == client_id(request), body.get("rival") or None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.delete("/api/stage/{entry_id}")
@@ -476,10 +492,13 @@ def stage_start(request: Request, body: dict = Body(...)):
     room = need_host(request)
     if body.get("song_id"):
         _song_or_404(str(body["song_id"]))
+    client = body.get("client") or client_id(request)
     try:
-        return room.start(body.get("entry_id"), body.get("song_id"), body.get("client") or client_id(request), True)
+        return room.start(body.get("entry_id"), body.get("song_id"), client, client == client_id(request), body.get("rival") or None)
     except KeyError as e:
         raise HTTPException(404, str(e.args[0]))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.post("/api/stage/{entry_id}/finish")
@@ -491,8 +510,8 @@ def stage_finish(entry_id: str, request: Request):
 @app.post("/api/vote")
 def vote(request: Request, body: dict = Body(...)):
     try:
-        need_room(request).vote(client_id(request), int(body.get("score", 0)))
-    except (LookupError, PermissionError) as e:
+        need_room(request).vote(client_id(request), body.get("score"), body.get("pick"))
+    except (LookupError, PermissionError, ValueError) as e:
         raise HTTPException(400, str(e))
     return {"ok": True}
 
@@ -582,6 +601,40 @@ def set_lyrics_times(song_id: str, body: dict = Body(...)):
     store.write_lyrics(song_id, current)
     store.update(song_id, offset=0.0)
     return current
+
+
+# ---------- Duelo: quem canta cada linha ----------
+
+@app.get("/api/songs/{song_id}/duel")
+async def get_duel(song_id: str):
+    """Divisão da letra para o duelo (a salva, ou a automática na primeira vez)."""
+    _song_or_404(song_id)
+    try:
+        return await run_in_threadpool(duel.get, song_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/songs/{song_id}/duel/detect")
+async def detect_duel(song_id: str):
+    """Sugestão automática (não salva: o editor mostra e a pessoa confere)."""
+    _song_or_404(song_id)
+    try:
+        return await run_in_threadpool(duel.detect, song_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.put("/api/songs/{song_id}/duel")
+def set_duel(song_id: str, request: Request, body: dict = Body(...)):
+    _song_or_404(song_id)
+    if not (is_admin(request) or is_room_host(request)):
+        raise HTTPException(403, "Só o telão do anfitrião faz isso.")
+    try:
+        duel.save(song_id, list(body.get("parts") or []), "manual")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return duel.get(song_id)
 
 
 @app.get("/api/songs/{song_id}/covers")

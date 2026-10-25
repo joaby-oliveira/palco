@@ -10,7 +10,8 @@ fillIcons();
 let backTo = null; // música cuja ficha abriu a tela de letra/capa: o foco volta para ela
 
 function show(view) {
-  for (const v of ["home", "lyrics", "cover"]) $(`view-${v}`).hidden = v !== view;
+  for (const v of ["home", "lyrics", "cover", "duel"]) $(`view-${v}`).hidden = v !== view;
+  if (view !== "duel") stopLine();
   window.scrollTo(0, 0);
   if (!document.documentElement.classList.contains("kbd-nav") || $(`view-${view}`).contains(document.activeElement)) return;
   const card = view === "home" && backTo && document.querySelector(`.song-card[data-id="${backTo}"]`);
@@ -107,6 +108,7 @@ watchState((s) => {
   renderStageQueue();
   renderPreparing();
   renderLibrary();
+  if ($("duel-dlg").open) renderDuel();
 }, (fx) => {
   Fx.play(fx.name, fx.client);
   showReaction(fx);
@@ -160,15 +162,16 @@ function renderHero() {
   box.replaceChildren(h("div", { class: "hero-body" },
     h("img", { class: "hero-cover", src: s.cover, alt: "" }),
     h("div", { class: "hero-info" },
-      h("h2", { class: "hero-label", id: "hero-label" }, "PRÓXIMO NO PALCO"),
-      h("div", { class: "hero-singer" }, avatar(next.singer, "lg"), h("span", { class: "who" }, next.singer.name.toUpperCase())),
+      h("h2", { class: "hero-label", id: "hero-label" }, next.rival ? "PRÓXIMO DUELO" : "PRÓXIMO NO PALCO"),
+      h("div", { class: "hero-singer" }, entryAvatars(next, "lg"), h("span", { class: "who" }, entryName(next).toUpperCase())),
       h("div", { class: "hero-song" }, s.title, " ", h("span", {}, `· ${s.artist}`)),
       h("div", { class: "chips" },
         h("span", { class: `status ${songStatus(s).tone} pill` }, songStatus(s).label),
         s.duration ? h("span", { class: "pill" }, fmtTime(s.duration)) : null,
         s.key ? h("span", { class: "pill" }, `Tom: ${s.key.note} ${s.key.scale === "Minor" ? "menor" : "maior"}`) : null,
         s.kind === "karaoke" ? h("span", { class: "pill" }, "Versão karaokê") : null,
-        s.kind === "dance" ? h("span", { class: "pill" }, "Dança") : null),
+        s.kind === "dance" ? h("span", { class: "pill" }, "Dança") : null,
+        next.rival ? h("span", { class: "pill" }, icon("duel", 16), "Duelo") : null),
       h("div", { class: "hero-actions" },
         h("button", { class: "btn big", "data-tv-default": true, onclick: () => startEntry(next) }, icon(s.kind === "dance" ? "dance" : "play", 22), s.kind === "dance" ? "BORA DANÇAR" : "SOLTAR O SOM"),
         h("button", { class: "btn ghost", onclick: () => api(`/api/stage/${next.id}/later`, { method: "POST" }).catch((e) => toast(e.message, true)) }, "Pular a vez"),
@@ -196,8 +199,8 @@ function renderStageQueue() {
     const s = BY_ID[e.song_id];
     list.append(h("li", { class: "q-item" + (s && s.status === "error" ? " err" : "") },
       h("span", { class: "n" }, i + 1),
-      avatar(e.singer),
-      h("span", { class: "meta" }, h("span", { class: "t" }, s ? s.title : "?"), h("span", { class: "s" }, e.singer.name)),
+      entryAvatars(e),
+      h("span", { class: "meta" }, h("span", { class: "t" }, s ? s.title : "?"), h("span", { class: "s" }, e.rival ? `Duelo: ${entryName(e)}` : e.singer.name)),
       progressInfo(s),
       s && s.status === "ready" ? h("button", { class: "x", title: "Cantar agora", "aria-label": `Cantar agora: ${s.title}`, onclick: () => startEntry(e) }, icon("play", 16)) : null,
       h("button", { class: "x", title: "Tirar da fila", "aria-label": "Tirar da fila", onclick: () => removeEntry(e) }, icon("x", 16))));
@@ -269,6 +272,7 @@ function openSong(s) {
   if (s.kind === "dance") { /* a dança não usa letra */ }
   else if (!s.has_lyrics) notes.push(["warn", "Sem letra. Escolhe uma em Trocar letra."]);
   else if (!s.lyrics_synced) notes.push(["warn", "A letra não tem tempos. No palco, use Acertar letra › Gravar sincronia."]);
+  if (s.duel === "manual") notes.push(["", "Pronta para duelo: as vozes foram divididas à mão."]);
 
   const close = () => $("song-dlg").close();
   const actions = [
@@ -276,6 +280,8 @@ function openSong(s) {
     h("button", { class: "btn pink", onclick: async () => {
       try { await api("/api/stage", { method: "POST", body: { song_id: s.id } }); toast("Na fila!"); close(); } catch (e) { toast(e.message, true); }
     } }, icon("plus", 18), "Pôr na fila"),
+    canDuel(s) ? h("button", { class: "btn ghost", onclick: () => { close(); openDuel(s); } }, icon("duel", 18), "Duelo") : null,
+    canDuel(s) ? h("button", { class: "btn ghost", onclick: () => { close(); openDuelSplit(s); } }, icon("duel", 18), "Dividir as vozes") : null,
     s.kind === "dance" ? null : h("button", { class: "btn ghost", onclick: () => { close(); openLyrics(s); } }, icon("lyrics", 18), "Trocar letra"),
     s.kind === "dance" ? h("a", { class: "btn ghost", href: `/review/${s.id}` }, icon("sliders", 18), "Análise das danças") : null,
     h("button", { class: "btn ghost", onclick: () => { close(); openCover(s); } }, icon("image", 18), "Trocar capa"),
@@ -328,6 +334,170 @@ $("open-dance").addEventListener("click", () => {
   $("search-form").querySelector('[data-kind="dance"]').click();
   window.scrollTo(0, 0);
   $("search-input").focus();
+});
+
+// ---------- Duelo ----------
+// Os dois cantam a mesma música; a letra vem dividida (A, B ou os dois juntos).
+
+const canDuel = (s) => s.status === "ready" && s.kind !== "dance" && s.has_lyrics;
+const duel = { song: null, a: null, b: null };
+
+$("open-duel").addEventListener("click", () => openDuel());
+
+function openDuel(song) {
+  const songs = STATE.songs.filter(canDuel).reverse();
+  if (!songs.length) { toast("Nenhuma música com letra no repertório ainda.", true); return; }
+  // Músicas divididas à mão primeiro: são as preparadas para duelo
+  songs.sort((x, y) => (y.duel === "manual") - (x.duel === "manual"));
+  duel.song = (song && song.id) || (duel.song && BY_ID[duel.song] && canDuel(BY_ID[duel.song]) ? duel.song : songs[0].id);
+  $("duel-song").replaceChildren(...songs.map((s) => h("option", { value: s.id, selected: s.id === duel.song },
+    `${s.duel === "manual" ? "★ " : ""}${s.title} · ${s.artist}`)));
+  renderDuel();
+  $("duel-dlg").showModal();
+}
+$("duel-song").addEventListener("change", () => { duel.song = $("duel-song").value; renderDuel(); });
+
+function renderDuel() {
+  const s = BY_ID[duel.song];
+  const split = h("span", {}, !s ? "" : s.duel === "manual" ? "Vozes divididas à mão. " : "A divisão das vozes é automática. ");
+  if (s) split.append(h("button", { type: "button", class: "linklike", onclick: () => { $("duel-dlg").close(); openDuelSplit(s); } }, s.duel === "manual" ? "Mudar a divisão" : "Conferir e ajustar"));
+  $("duel-split").replaceChildren(split);
+  const people = STATE.party.people || [];
+  if (!people.some((p) => p.client === duel.a)) duel.a = null;
+  if (!people.some((p) => p.client === duel.b)) duel.b = null;
+  for (const side of ["a", "b"]) {
+    const other = side === "a" ? duel.b : duel.a;
+    const box = $(`duel-${side}`);
+    box.replaceChildren(...people.map((p) => h("button", {
+      type: "button", class: duel[side] === p.client ? "on" : "", "aria-pressed": duel[side] === p.client, disabled: p.client === other,
+      onclick: () => { duel[side] = p.client; renderDuel(); },
+    }, avatar(p), p.name)));
+    if (!people.length) box.append(h("span", { class: "sub" }, "Ninguém na festa ainda. Chama a galera pelo QR."));
+  }
+  const ok = s && duel.a && duel.b;
+  $("duel-queue").disabled = !ok;
+  $("duel-now").disabled = !ok;
+}
+
+$("duel-add").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("duel-add-name").value.trim();
+  if (!name) return;
+  try {
+    const p = await api("/api/room/people", { method: "POST", body: { name } });
+    $("duel-add-name").value = "";
+    if (!duel.a) duel.a = p.client; else if (!duel.b) duel.b = p.client;
+    STATE.party.people = (STATE.party.people || []).concat(p);
+    renderDuel();
+  } catch (err) { toast(err.message, true); }
+});
+
+$("duel-queue").addEventListener("click", async () => {
+  try {
+    await api("/api/stage", { method: "POST", body: { song_id: duel.song, client: duel.a, rival: duel.b } });
+    $("duel-dlg").close();
+    toast("Duelo na fila!");
+  } catch (e) { toast(e.message, true); }
+});
+$("duel-now").addEventListener("click", async () => {
+  try {
+    const entry = await api("/api/stage/start", { method: "POST", body: { song_id: duel.song, client: duel.a, rival: duel.b } });
+    location.href = `/play/${entry.song_id}?entry=${entry.id}`;
+  } catch (e) { toast(e.message, true); }
+});
+
+// ---------- Dividir as vozes ----------
+
+const PART_LABEL = { a: "A", b: "B", ab: "Juntos" };
+let split = null; // { song, lines, parts }
+
+async function openDuelSplit(song) {
+  backTo = song.id;
+  $("duel-song-title").textContent = song.title;
+  $("duel-note").textContent = "Carregando a letra…";
+  $("duel-lines").replaceChildren();
+  show("duel");
+  try {
+    const [lyr, res] = await Promise.all([api(`/api/songs/${song.id}/lyrics`), api(`/api/songs/${song.id}/duel`)]);
+    split = { song, lines: lyr.lines, parts: res.parts.slice() };
+    $("duel-note").textContent = res.source === "manual" ? "Divisão feita à mão." : res.note;
+  } catch (e) { $("duel-note").textContent = e.message; return; }
+  // Só a voz, quando separada: fica mais fácil ouvir quem canta
+  $("duel-audio").src = `/media/${song.id}/${song.separated ? "lead" : "original"}.mp3`;
+  renderSplit();
+}
+
+function renderSplit() {
+  const list = $("duel-lines");
+  const off = split.song.offset || 0;
+  list.replaceChildren(...split.lines.map((l, i) => {
+    if (!(l.text || "").trim()) return h("li", { class: "gap" }, "♪");
+    const p = split.parts[i];
+    return h("li", { class: p ? `p${p}` : "", "data-i": i },
+      h("span", { class: "tm" }, l.t == null ? "" : fmtTime(l.t + off)),
+      l.t == null ? h("span", { class: "x" }) : h("button", { class: "x", type: "button", title: "Ouvir a partir desta linha", "aria-label": `Ouvir: ${l.text}`, onclick: () => playLine(i) }, icon("play", 14)),
+      h("span", { class: "txt" }, l.text),
+      h("span", { class: "seg", role: "group", "aria-label": "Quem canta" }, ...["a", "b", "ab"].map((k) => h("button", {
+        type: "button", "data-p": k, class: p === k ? "on" : "", "aria-pressed": p === k,
+        onclick: () => { split.parts[i] = k; renderSplit(); },
+      }, PART_LABEL[k]))));
+  }));
+  const n = (k) => split.parts.filter((p) => p === k).length;
+  $("duel-count").textContent = `A: ${n("a")} · B: ${n("b")} · Juntos: ${n("ab")} linhas`;
+  markPlaying();
+}
+
+let lineEnd = null;
+function playLine(i) {
+  const off = split.song.offset || 0;
+  const next = split.lines.slice(i + 1).find((l) => l.t != null);
+  const audio = $("duel-audio");
+  audio.currentTime = Math.max(0, split.lines[i].t + off - 0.3);
+  lineEnd = next ? next.t + off : null;
+  audio.play().catch((e) => toast(e.message, true));
+  $("duel-stop").hidden = false;
+}
+function stopLine() {
+  $("duel-audio").pause();
+  $("duel-stop").hidden = true;
+  markPlaying();
+}
+$("duel-stop").addEventListener("click", stopLine);
+// Toca até o fim da linha escolhida e marca na lista a linha que está tocando
+function markPlaying() {
+  if (!split) return;
+  const audio = $("duel-audio");
+  const t = audio.currentTime - (split.song.offset || 0);
+  let cur = -1;
+  if (!audio.paused) split.lines.forEach((l, i) => { if (l.t != null && l.t <= t) cur = i; });
+  $("duel-lines").querySelectorAll("li[data-i]").forEach((li) => li.classList.toggle("playing", Number(li.dataset.i) === cur));
+}
+$("duel-audio").addEventListener("timeupdate", () => {
+  if (lineEnd != null && $("duel-audio").currentTime >= lineEnd) { stopLine(); return; }
+  markPlaying();
+});
+
+$("duel-detect").addEventListener("click", async () => {
+  if (!split) return;
+  const btn = $("duel-detect");
+  btn.disabled = true;
+  $("duel-note").textContent = "Ouvindo as vozes…";
+  try {
+    const res = await api(`/api/songs/${split.song.id}/duel/detect`, { method: "POST" });
+    split.parts = res.parts.slice();
+    $("duel-note").textContent = `${res.note} Confira e salve.`;
+    renderSplit();
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false;
+});
+
+$("duel-save").addEventListener("click", async () => {
+  if (!split) return;
+  try {
+    await api(`/api/songs/${split.song.id}/duel`, { method: "PUT", body: { parts: split.parts } });
+    toast("Divisão salva. A música está pronta para duelo.");
+    show("home");
+  } catch (e) { toast(e.message, true); }
 });
 
 // ---------- Escolher letra ----------
