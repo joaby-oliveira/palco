@@ -219,7 +219,7 @@ document.querySelectorAll("[data-shift]").forEach((b) => b.addEventListener("cli
 $("bt").addEventListener("change", () => {
   btDelay = Math.max(0, parseFloat($("bt").value) || 0);
   activeIdx = -2;
-  api("/api/config", { method: "POST", body: { bt_delay: btDelay } }).catch(() => toast("O atraso do Bluetooth só pode ser salvo no notebook.", true));
+  deviceSet({ bt_delay: btDelay });
 });
 
 // ---------- Gravar sincronia em tempo real ----------
@@ -325,7 +325,7 @@ $("seek").addEventListener("change", () => { seeking = false; seek($("seek").val
 $("blur").addEventListener("input", () => { $("lyrics-bg").style.filter = `blur(${$("blur").value}px) brightness(.5) saturate(1.2)`; });
 $("bright").addEventListener("input", () => { $("lyrics-box").style.setProperty("--dim", $("bright").value); });
 $("fx-vol").addEventListener("input", () => Fx.setVolume(parseFloat($("fx-vol").value)));
-$("fx-vol").addEventListener("change", () => api("/api/config", { method: "POST", body: { fx_volume: parseFloat($("fx-vol").value) } }).catch(() => {}));
+$("fx-vol").addEventListener("change", () => deviceSet({ fx_volume: parseFloat($("fx-vol").value) }));
 
 $("key-note").replaceChildren(...NOTES.map((n) => h("option", {}, n)));
 for (const id of ["key-note", "key-scale"]) $(id).addEventListener("change", () => {
@@ -584,9 +584,9 @@ async function init() {
   $("song-only").hidden = Boolean(ENTRY_ID);
   $("lyrics-bg").style.backgroundImage = `url("${song.cover}")`;
   if (song.key) { $("key-note").value = song.key.note; $("key-scale").value = song.key.scale; }
-  btDelay = (state.config && state.config.bt_delay) || 0;
+  btDelay = deviceGet("bt_delay");
   $("bt").value = btDelay;
-  $("fx-vol").value = (state.config && state.config.fx_volume) ?? 0.7;
+  $("fx-vol").value = deviceGet("fx_volume");
   Fx.setVolume(parseFloat($("fx-vol").value));
   setOffset(song.offset || 0, false);
   renderParty();

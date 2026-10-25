@@ -8,8 +8,8 @@
 <link rel="icon" href="/static/disco.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=3">
-<link rel="stylesheet" href="/static/mobile.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=5">
+<link rel="stylesheet" href="/static/mobile.css?v=4">
 </head>
 <body>
 <!-- Primeira vez: como a galera te chama -->
@@ -24,9 +24,21 @@
   </form>
 </div>
 
+<!-- Chegou sem o QR: entra pelo código que aparece no telão -->
+<div class="onboard" id="join" hidden>
+  <img src="/static/disco.svg" width="110" height="121" alt="">
+  <div class="display" style="font-size:34px;color:var(--gold);line-height:1">PALCO</div>
+  <form id="join-form" class="onboard-form">
+    <label for="join-input" class="display" style="font-size:20px">QUAL É O CÓDIGO DA FESTA?</label>
+    <input type="text" id="join-input" maxlength="8" autocomplete="off" autocapitalize="characters" placeholder="Está no telão, embaixo do QR" required style="text-transform:uppercase;letter-spacing:3px;text-align:center">
+    <button class="btn big" type="submit">ENTRAR</button>
+    <p class="sub" style="margin:0;text-align:center" id="join-hint">Ou aponta a câmera para o QR do telão.</p>
+  </form>
+</div>
+
 <main class="m-wrap" id="app">
   <header class="m-top">
-    <span class="display" style="font-size:22px;color:var(--gold)">PALCO</span>
+    <span class="display" style="font-size:22px;color:var(--gold)">PALCO <small class="room-code" id="room-code"></small></span>
     <button class="me-chip" id="me-chip" aria-label="Trocar meu nome"></button>
   </header>
 
@@ -78,7 +90,7 @@
   <button data-tab="efeitos"><i data-icon="pads" data-size="22"></i>Efeitos</button>
 </nav>
 
-<script src="/static/common.js?v=3"></script>
-<script src="/static/mobile.js?v=3"></script>
+<script src="/static/common.js?v=5"></script>
+<script src="/static/mobile.js?v=4"></script>
 </body>
 </html>

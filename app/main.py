@@ -23,7 +23,8 @@ STEMS = {"original", "instrumental", "lead", "backing"}
 app = FastAPI(title="Karaoke")
 
 # No servidor (atrás de um proxy com HTTPS) o endereço dos QR codes é o domínio,
-# e quem é o anfitrião é decidido pela chave, já que ninguém chega pelo localhost.
+# e quem é o admin (ajustes do servidor) é decidido pela chave, já que ninguém chega pelo localhost.
+# Anfitrião de festa qualquer um vira: cada navegador que abre o telão ganha a sua sala.
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
 HOST_KEY = os.environ.get("HOST_KEY", "")
 HOST_COOKIE = "palco_host"
@@ -110,10 +111,10 @@ def lan_ip() -> str:
         s.close()
 
 
-def session_url() -> str:
-    if PUBLIC_URL:
-        return f"{PUBLIC_URL}/m"
-    return f"http://{lan_ip()}:{config.get('port')}/m"
+def session_url(room_id: str = "") -> str:
+    """Endereço do QR do telão: a página do celular já com o código da sala."""
+    base = PUBLIC_URL or f"http://{lan_ip()}:{config.get('port')}"
+    return f"{base}/m?sala={room_id}" if room_id else f"{base}/m"
 
 
 def cam_url() -> str:
@@ -123,7 +124,8 @@ def cam_url() -> str:
     return f"https://{lan_ip()}:{config.get('https_port')}/cam"
 
 
-def is_host(request) -> bool:
+def is_admin(request) -> bool:
+    """Dono do servidor: mexe nos ajustes do site inteiro (chaves pagas, cookies do YouTube)."""
     if request.client.host in ("127.0.0.1", "::1", "localhost"):
         return True
     cookie = request.cookies.get(HOST_COOKIE, "")
@@ -134,16 +136,44 @@ def client_id(request) -> str:
     return request.headers.get("x-client") or request.query_params.get("client") or "anon"
 
 
-def state(host: bool, client: str = "") -> dict:
+def room_of(request) -> tuple[party.Room | None, bool]:
+    """A sala do pedido (cabeçalho X-Room ou ?sala=) e se quem pediu é o anfitrião dela."""
+    rid = request.headers.get("x-room") or request.query_params.get("sala") or ""
+    token = request.headers.get("x-room-token") or request.query_params.get("token") or ""
+    return party.find(rid, token)
+
+
+def need_room(request) -> party.Room:
+    room, _ = room_of(request)
+    if not room:
+        raise HTTPException(404, "Essa festa não existe mais. Escaneia o QR do telão de novo.")
+    return room
+
+
+def need_host(request) -> party.Room:
+    room, host = room_of(request)
+    if not room or not host:
+        raise HTTPException(403, "Só o telão do anfitrião da festa faz isso.")
+    return room
+
+
+def is_room_host(request) -> bool:
+    return room_of(request)[1]
+
+
+def state(room: party.Room | None, host: bool, admin: bool, client: str = "") -> dict:
+    public = {"provider": config.get("provider"), "dance_params": config.get("dance_params")}
     return {
         "songs": store.snapshot(),
-        "config": config.public() if host else {"provider": config.get("provider")},
-        "providers": providers.listing() if host else [],
-        "session_url": session_url(),
+        "config": config.public() if admin else public,
+        "providers": providers.listing() if admin else [],
+        "room": {"id": room.id, "host_name": room.host_name} if room else None,
+        "session_url": session_url(room.id if room else ""),
         "is_host": host,
+        "is_admin": admin,
         # Código mudou depois que o servidor abriu: o telão pede para reiniciar
-        "needs_restart": host and code_version() > CODE_AT_START,
-        "party": party.snapshot(client),
+        "needs_restart": admin and code_version() > CODE_AT_START,
+        "party": room.snapshot(client) if room else party.empty_snapshot(client),
         "fx": {"sounds": party.sounds(), "favorites": party.favorites()},
     }
 
@@ -191,34 +221,51 @@ def player(song_id: str):
 
 # ---------- Estado em tempo real ----------
 
+@app.post("/api/rooms")
+def create_room():
+    """Festa nova: quem abre o telão vira o anfitrião dela (guarda a chave no navegador)."""
+    room = party.create()
+    return {"id": room.id, "token": room.token}
+
+
+@app.patch("/api/room")
+def patch_room(request: Request, body: dict = Body(...)):
+    room = need_host(request)
+    if "host_name" in body:
+        room.set_host_name(body["host_name"])
+    return {"id": room.id, "host_name": room.host_name}
+
+
 @app.get("/api/state")
 def get_state(request: Request):
-    return state(is_host(request), client_id(request))
+    room, host = room_of(request)
+    return state(room, host, is_admin(request), client_id(request))
 
 
 @app.websocket("/ws")
 async def ws(socket_: WebSocket):
     await socket_.accept()
-    host = is_host(socket_)
+    room, host = room_of(socket_)
+    admin = is_admin(socket_)
     client = socket_.query_params.get("client") or "anon"
-    # Quem conta como "na festa" são os celulares; o notebook não entra na conta
-    if not host:
-        party.connected(client, 1)
-    seen, fx_seen = -1, party.fx_event["seq"]
+    # Quem conta como "na festa" são os celulares; o telão não entra na conta
+    if room and not host:
+        room.connected(client, 1)
+    seen, fx_seen = -1, room.fx_event["seq"] if room else 0
     try:
         while True:
             if store.version != seen:
                 seen = store.version
-                await socket_.send_json(state(host, client))
-            if party.fx_event["seq"] != fx_seen:
-                fx_seen = party.fx_event["seq"]
-                await socket_.send_json({"fx_event": party.fx_event})
+                await socket_.send_json(state(room, host, admin, client))
+            if room and room.fx_event["seq"] != fx_seen:
+                fx_seen = room.fx_event["seq"]
+                await socket_.send_json({"fx_event": room.fx_event})
             await asyncio.sleep(0.1)
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
-        if not host:
-            party.connected(client, -1)
+        if room and not host:
+            room.connected(client, -1)
 
 
 # ---------- Celular como câmera do modo dança ----------
@@ -261,8 +308,9 @@ async def stage_cam_socket(socket_: WebSocket):
 
 
 @app.get("/api/qr.svg")
-def qr(target: str = ""):
-    img = qrcode.make(cam_url() if target == "cam" else session_url(), image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2)
+def qr(target: str = "", sala: str = ""):
+    room, _ = party.find(sala)
+    img = qrcode.make(cam_url() if target == "cam" else session_url(room.id if room else ""), image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2)
     buf = io.BytesIO()
     img.save(buf)
     return Response(buf.getvalue(), media_type="image/svg+xml")
@@ -294,15 +342,15 @@ async def preview(video_id: str):
 
 @app.get("/api/youtube/cookies")
 def youtube_cookies(request: Request):
-    if not is_host(request):
+    if not is_admin(request):
         raise HTTPException(403)
     return youtube.cookies_info()
 
 
 @app.post("/api/youtube/cookies")
 async def set_youtube_cookies(request: Request, body: dict = Body(...)):
-    if not is_host(request):
-        raise HTTPException(403, "Os cookies só podem ser mudados no notebook.")
+    if not is_admin(request):
+        raise HTTPException(403, "Os cookies só podem ser mudados pelo dono do servidor.")
     try:
         return await run_in_threadpool(youtube.save_cookies, str(body.get("text") or ""))
     except ValueError as e:
@@ -311,7 +359,7 @@ async def set_youtube_cookies(request: Request, body: dict = Body(...)):
 
 @app.delete("/api/youtube/cookies")
 def delete_youtube_cookies(request: Request):
-    if not is_host(request):
+    if not is_admin(request):
         raise HTTPException(403)
     youtube.delete_cookies()
     return youtube.cookies_info()
@@ -330,15 +378,17 @@ def add_song(request: Request, video: dict = Body(...)):
     song = store.add(video, artist, title, client_id(request), kind, want_backing)
     # Pedido de música: já entra na fila da festa com o nome de quem pediu
     if video.get("queue"):
-        party.enqueue(song["id"], client_id(request), is_host(request))
+        room, host = room_of(request)
+        if room:
+            room.enqueue(song["id"], client_id(request), host)
     return song
 
 
 @app.delete("/api/songs/{song_id}")
 def delete_song(song_id: str, request: Request):
     song = _song_or_404(song_id)
-    if not is_host(request) and song["owner"] != client_id(request):
-        raise HTTPException(403, "Só dá para apagar as suas músicas.")
+    if not is_admin(request) and song["owner"] != client_id(request):
+        raise HTTPException(403, "Só dá para apagar as músicas que você pediu.")
     if song["status"] == "processing":
         worker.cancel(song_id)
         store.update(song_id, step="Cancelando...")
@@ -351,8 +401,8 @@ def delete_song(song_id: str, request: Request):
 @app.post("/api/songs/{song_id}/retry")
 def retry(song_id: str, request: Request):
     song = _song_or_404(song_id)
-    if not is_host(request) and song["owner"] != client_id(request):
-        raise HTTPException(403)
+    if not (is_admin(request) or is_room_host(request)) and song["owner"] != client_id(request):
+        raise HTTPException(403, "Só dá para tentar de novo as músicas que você pediu.")
     store.update(song_id, status="queued", step="Na fila", progress=0, error=None)
     return {"ok": True}
 
@@ -361,8 +411,8 @@ def retry(song_id: str, request: Request):
 def separate_backing(song_id: str, request: Request):
     """Separa os backing vocals de uma música já pronta (gasta mais uma separação)."""
     song = _song_or_404(song_id)
-    if not is_host(request):
-        raise HTTPException(403)
+    if not (is_admin(request) or is_room_host(request)):
+        raise HTTPException(403, "Só o telão do anfitrião faz isso.")
     if not song.get("separated") or song.get("has_backing"):
         raise HTTPException(400, "Essa música não precisa dessa separação.")
     provider = providers.get(config.get("provider"))
@@ -375,8 +425,8 @@ def separate_backing(song_id: str, request: Request):
 @app.patch("/api/songs/{song_id}")
 def patch_song(song_id: str, request: Request, fields: dict = Body(...)):
     _song_or_404(song_id)
-    if not is_host(request):
-        raise HTTPException(403)
+    if not (is_admin(request) or is_room_host(request)):
+        raise HTTPException(403, "Só o telão do anfitrião faz isso.")
     allowed = {k: v for k, v in fields.items() if k in ("offset", "key", "title", "artist")}
     store.update(song_id, **allowed)
     return store.get(song_id)
@@ -396,13 +446,19 @@ def set_me(request: Request, body: dict = Body(...)):
 def stage_add(request: Request, body: dict = Body(...)):
     """Entra na fila para cantar uma música da biblioteca."""
     _song_or_404(str(body.get("song_id")))
-    return party.enqueue(body["song_id"], client_id(request), is_host(request))
+    room, host = room_of(request)
+    if not room:
+        need_room(request)
+    return room.enqueue(body["song_id"], client_id(request), host)
 
 
 @app.delete("/api/stage/{entry_id}")
 def stage_remove(entry_id: str, request: Request):
+    room, host = room_of(request)
+    if not room:
+        need_room(request)
     try:
-        party.remove(entry_id, client_id(request), is_host(request))
+        room.remove(entry_id, client_id(request), host)
     except PermissionError as e:
         raise HTTPException(403, str(e))
     return {"ok": True}
@@ -410,37 +466,32 @@ def stage_remove(entry_id: str, request: Request):
 
 @app.post("/api/stage/{entry_id}/later")
 def stage_later(entry_id: str, request: Request):
-    if not is_host(request):
-        raise HTTPException(403)
-    party.to_end(entry_id)
+    need_host(request).to_end(entry_id)
     return {"ok": True}
 
 
 @app.post("/api/stage/start")
 def stage_start(request: Request, body: dict = Body(...)):
     """Põe no palco um pedido da fila (entry_id) ou uma música direto (song_id)."""
-    if not is_host(request):
-        raise HTTPException(403)
+    room = need_host(request)
     if body.get("song_id"):
         _song_or_404(str(body["song_id"]))
     try:
-        return party.start(body.get("entry_id"), body.get("song_id"), body.get("client") or client_id(request), True)
+        return room.start(body.get("entry_id"), body.get("song_id"), body.get("client") or client_id(request), True)
     except KeyError as e:
         raise HTTPException(404, str(e.args[0]))
 
 
 @app.post("/api/stage/{entry_id}/finish")
 def stage_finish(entry_id: str, request: Request):
-    if not is_host(request):
-        raise HTTPException(403)
-    party.finish(entry_id)
+    need_host(request).finish(entry_id)
     return {"ok": True}
 
 
 @app.post("/api/vote")
 def vote(request: Request, body: dict = Body(...)):
     try:
-        party.vote(client_id(request), int(body.get("score", 0)))
+        need_room(request).vote(client_id(request), int(body.get("score", 0)))
     except (LookupError, PermissionError) as e:
         raise HTTPException(400, str(e))
     return {"ok": True}
@@ -448,8 +499,11 @@ def vote(request: Request, body: dict = Body(...)):
 
 @app.post("/api/fx/{name}")
 def fx(name: str, request: Request):
+    room, host = room_of(request)
+    if not room:
+        need_room(request)
     try:
-        party.fx(name, client_id(request), is_host(request))
+        room.fx(name, client_id(request), host)
     except KeyError as e:
         raise HTTPException(404, str(e.args[0]))
     return {"ok": True}
@@ -560,8 +614,8 @@ def dance_video(song_id: str):
 def save_dance_session(song_id: str, request: Request, body: dict = Body(...)):
     """Guarda uma dança (pontos de cada quadro e notas) para a tela de análise."""
     _song_or_404(song_id)
-    if not is_host(request):
-        raise HTTPException(403)
+    if not (is_admin(request) or is_room_host(request)):
+        raise HTTPException(403, "Só o telão do anfitrião guarda a dança.")
     return dance.save_session(song_id, body)
 
 
@@ -581,8 +635,8 @@ def dance_session(song_id: str, session_id: str):
 
 @app.delete("/api/songs/{song_id}/dance-sessions/{session_id}")
 def delete_dance_session(song_id: str, session_id: str, request: Request):
-    if not is_host(request):
-        raise HTTPException(403)
+    if not (is_admin(request) or is_room_host(request)):
+        raise HTTPException(403, "Só o telão do anfitrião apaga a dança.")
     dance.delete_session(song_id, session_id)
     return {"ok": True}
 
@@ -610,7 +664,7 @@ def media(song_id: str, stem: str):
 
 @app.get("/api/usage")
 async def get_usage(request: Request, force: bool = False):
-    if not is_host(request):
+    if not is_admin(request):
         raise HTTPException(403)
     return await run_in_threadpool(usage.get, force)
 
@@ -619,15 +673,15 @@ async def get_usage(request: Request, force: bool = False):
 
 @app.get("/api/config")
 def get_config(request: Request):
-    if not is_host(request):
+    if not is_admin(request):
         raise HTTPException(403)
     return {"config": config.public(), "providers": providers.listing()}
 
 
 @app.post("/api/config")
 def set_config(request: Request, values: dict = Body(...)):
-    if not is_host(request):
-        raise HTTPException(403, "As configurações só podem ser mudadas no notebook.")
+    if not is_admin(request):
+        raise HTTPException(403, "Esses ajustes só podem ser mudados pelo dono do servidor.")
     config.update(values)
     usage.invalidate()
     store.touch()

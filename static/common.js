@@ -11,8 +11,76 @@ function getClientId() {
 }
 const CLIENT = getClientId();
 
+// ---------- Sala da festa ----------
+// O telão (e o palco, no mesmo navegador) é o anfitrião de uma sala própria: na
+// primeira visita o servidor cria a sala e a chave fica guardada aqui. O celular
+// entra na sala do QR (/m?sala=CÓDIGO), e o código fica guardado para as próximas vezes.
+
+const GUEST_PAGE = ["/m", "/cam"].includes(location.pathname);
+const ROOM_KEY = GUEST_PAGE ? "palco-sala" : "palco-festa";
+
+function storedRoom() {
+  try { return JSON.parse(localStorage.getItem(ROOM_KEY) || "null"); } catch (e) { return null; }
+}
+function saveRoom(room) {
+  try { localStorage.setItem(ROOM_KEY, JSON.stringify(room)); } catch (e) {}
+}
+
+let ROOM = storedRoom();
+if (GUEST_PAGE) {
+  const code = new URLSearchParams(location.search).get("sala");
+  if (code) { ROOM = { id: code.trim().toUpperCase() }; saveRoom(ROOM); }
+}
+
+async function newRoom() {
+  const r = await fetch("/api/rooms", { method: "POST", headers: { "X-Client": CLIENT } });
+  if (!r.ok) throw new Error("Não consegui abrir a festa no servidor.");
+  ROOM = await r.json();
+  saveRoom(ROOM);
+  return ROOM;
+}
+const ROOM_READY = GUEST_PAGE || (ROOM && ROOM.token) ? Promise.resolve(ROOM) : newRoom().catch(() => null);
+
+// Celular sem sala: entra pelo código que aparece no telão
+function joinRoom(code) {
+  ROOM = { id: String(code).trim().toUpperCase() };
+  saveRoom(ROOM);
+  location.replace(`${location.pathname}?sala=${encodeURIComponent(ROOM.id)}`);
+}
+
+// O anfitrião começa uma festa do zero (fila, votos e convidados online zerados)
+async function restartParty() {
+  await newRoom();
+  location.reload();
+}
+
+function roomHeaders(headers) {
+  if (ROOM && ROOM.id) headers["X-Room"] = ROOM.id;
+  if (ROOM && ROOM.token) headers["X-Room-Token"] = ROOM.token;
+  return headers;
+}
+
+// <img data-qr>: o QR do telão aponta para a página do celular já com o código da sala
+ROOM_READY.then(() => {
+  const set = () => document.querySelectorAll("img[data-qr]").forEach((img) => { img.src = `/api/qr.svg?sala=${ROOM ? encodeURIComponent(ROOM.id) : ""}`; });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", set); else set();
+});
+
+// Ajustes deste aparelho (volume dos efeitos, atraso da caixa Bluetooth): cada telão tem os seus
+const DEVICE_DEFAULTS = { fx_volume: 0.7, bt_delay: 0 };
+function deviceGet(key) {
+  try { const v = JSON.parse(localStorage.getItem("palco-aparelho") || "{}")[key]; return v ?? DEVICE_DEFAULTS[key]; } catch (e) { return DEVICE_DEFAULTS[key]; }
+}
+function deviceSet(values) {
+  try {
+    const cur = JSON.parse(localStorage.getItem("palco-aparelho") || "{}");
+    localStorage.setItem("palco-aparelho", JSON.stringify(Object.assign(cur, values)));
+  } catch (e) {}
+}
+
 async function api(path, opts = {}) {
-  const init = { method: opts.method || "GET", headers: { "X-Client": CLIENT } };
+  await ROOM_READY;
+  const init = { method: opts.method || "GET", headers: roomHeaders({ "X-Client": CLIENT }) };
   if (opts.body !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(opts.body);
@@ -30,8 +98,10 @@ async function api(path, opts = {}) {
 // Efeitos sonoros chegam pelo mesmo canal, em mensagens separadas.
 function watchState(onState, onFx) {
   const handle = (data) => { restartBanner(data); onState(data); };
-  const connect = () => {
-    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?client=${CLIENT}`);
+  const connect = async () => {
+    await ROOM_READY;
+    const room = ROOM ? `&sala=${encodeURIComponent(ROOM.id)}${ROOM.token ? `&token=${encodeURIComponent(ROOM.token)}` : ""}` : "";
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?client=${CLIENT}${room}`);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.fx_event) { if (onFx) onFx(data.fx_event); } else handle(data);

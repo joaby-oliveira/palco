@@ -35,10 +35,24 @@ document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click
 
 // ---------- Estado ----------
 
+// ---------- Sala ----------
+
+$("join-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if ($("join-input").value.trim()) joinRoom($("join-input").value);
+});
+
 let firstState = true;
 watchState((s) => {
   STATE = s;
   BY_ID = Object.fromEntries(s.songs.map((x) => [x.id, x]));
+  // Sem sala (ou a festa acabou): pede o código do telão
+  $("join").hidden = Boolean(s.room);
+  if (!s.room) {
+    if (ROOM && ROOM.id) $("join-hint").textContent = `A festa ${ROOM.id} não existe mais. Confere o código no telão ou aponta a câmera para o QR.`;
+    return;
+  }
+  $("room-code").textContent = s.room.id;
   const me = s.party.me;
   if (firstState && !me) askName();
   firstState = false;

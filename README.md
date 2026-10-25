@@ -12,7 +12,7 @@ A v1 (visual antigo, sem fila da festa) está na branch `v1`.
 
 1. Dê dois cliques em `iniciar.bat`. Ele instala tudo na primeira vez, atualiza
    o yt-dlp e abre http://localhost:8000.
-2. Em **Ajustes do anfitrião** (ícone no canto de cima), cole o token do MVSEP
+2. Em **Ajustes** (ícone no canto de cima), cole o token do MVSEP
    (https://mvsep.com/user-api).
 3. A galera escaneia o QR **Chama a galera**, diz o nome e pede música. Do
    notebook também dá: busque e clique em **Pôr na fila**.
@@ -203,9 +203,16 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
 ```
 
 - `PUBLIC_URL`: endereço que vai nos QR codes (celular e câmera do modo dança).
-- `HOST_KEY`: no servidor ninguém chega pelo localhost, então o telão vira
-  anfitrião abrindo `https://palco.seudominio.com/?host=uma-chave-longa` uma
-  vez (fica num cookie por um ano). Sem a chave, o navegador é convidado.
+- Festas: qualquer pessoa que abre o site vira anfitriã de uma festa própria,
+  com um código (aparece no telão, embaixo do QR). O QR leva os convidados
+  para essa festa; cada uma tem a sua fila, palco, votos e efeitos. O
+  repertório e os sons são de todos. **Começar uma festa nova** (nos ajustes)
+  zera a fila e troca o código.
+- `HOST_KEY`: chave do dono do servidor. Abrindo
+  `https://palco.seudominio.com/?host=uma-chave-longa` uma vez (fica num
+  cookie por um ano), aparecem nos ajustes as partes do servidor: separação
+  de voz, tokens e cookies do YouTube. Também pode apagar qualquer música do
+  repertório. No notebook (localhost) isso vale sem chave.
 - `HTTPS_PORT=0` (já é o padrão da imagem): sem a porta 8443 com certificado
   próprio, porque o domínio já tem HTTPS.
 - YouTube bloqueando o download ("Sign in to confirm you're not a bot"),

@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/disco.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=4">
+<link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
 <div class="beams" aria-hidden="true"><span></span><span></span></div>
@@ -34,7 +34,7 @@
     <div class="top-actions">
       <button class="alert-chip" id="alert-chip" hidden></button>
       <a class="people-chip" href="#invite" title="Entrar pelo celular">
-        <span class="qr-mini"><img src="/api/qr.svg" alt=""></span>
+        <span class="qr-mini"><img data-qr alt=""></span>
         <span><b id="online-count">0 na festa</b><small>entrar pelo celular</small></span>
       </a>
       <button class="icon-btn" id="open-settings" title="Ajustes do anfitrião" aria-label="Ajustes do anfitrião"><i data-icon="sliders" data-size="22"></i></button>
@@ -68,10 +68,11 @@
           <ul class="queue-list" id="preparing"></ul>
         </div>
         <div class="invite" id="invite">
-          <div class="qr"><img src="/api/qr.svg" alt="QR code para entrar na festa"></div>
+          <div class="qr"><img data-qr alt="QR code para entrar na festa"></div>
           <div>
             <div class="title">CHAMA A GALERA</div>
-            <p>Aponta a câmera, escolhe a música e entra na fila. Mesmo Wi-Fi.</p>
+            <p>Aponta a câmera, escolhe a música e entra na fila.</p>
+            <div class="code">Código da festa: <b id="room-code"></b></div>
             <div class="url" id="session-url"></div>
           </div>
         </div>
@@ -178,9 +179,9 @@
   </div>
 </dialog>
 
-<script src="/static/common.js?v=4"></script>
+<script src="/static/common.js?v=6"></script>
 <script src="/static/tvnav.js?v=1"></script>
 <script src="/static/fx.js?v=3"></script>
-<script src="/static/app.js?v=4"></script>
+<script src="/static/app.js?v=6"></script>
 </body>
 </html>

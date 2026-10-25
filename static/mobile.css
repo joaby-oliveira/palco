@@ -38,3 +38,4 @@ body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 .lib-row .x:hover { background: var(--gold-hover); color: var(--gold-ink); }
 .lib-row img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; }
 .pads .pad { font-size: 14px; }
+.room-code { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: 2px; color: var(--muted); margin-left: 6px; vertical-align: 3px; }

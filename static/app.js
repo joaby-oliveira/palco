@@ -34,6 +34,8 @@ let USAGE = null;
 let lastStatuses = "";
 
 async function loadUsage(force = false) {
+  // O uso do serviço de separação é coisa do dono do servidor
+  if (!STATE.is_admin) { USAGE = null; renderAlert(); return; }
   try { USAGE = await api(`/api/usage${force ? "?force=true" : ""}`); } catch (e) { USAGE = null; }
   renderAlert();
 }
@@ -80,24 +82,26 @@ function usageDetails() {
     h("div", { class: "hint" }, `Cada música gasta ${u.per_song > 1 ? "2 separações (voz + backing vocals)" : "1 separação; separar os backing vocals gasta mais 1"}. O limite zera às ${resetTime(u)}. Até ${u.max_minutes} min e ${u.max_mb} MB por música. Inclui o que você usar no site do MVSEP.`));
 }
 
-loadUsage();
 setInterval(() => loadUsage(), 120000);
 
 // ---------- Estado em tempo real ----------
 
+let firstState = true;
 watchState((s) => {
   STATE = s;
+  if (firstState) { firstState = false; loadUsage(); }
   BY_ID = Object.fromEntries(s.songs.map((x) => [x.id, x]));
   // Atualiza o uso quando alguma música termina (ou falha)
   const statuses = s.songs.map((x) => x.id + x.status).join();
   if (lastStatuses && statuses !== lastStatuses && s.songs.some((x) => x.status === "ready" || x.status === "error")) loadUsage(true);
   lastStatuses = statuses;
   $("session-url").textContent = s.session_url;
+  $("room-code").textContent = s.room ? s.room.id : "";
   const n = s.party.online;
   $("online-count").textContent = n === 1 ? "1 na festa" : `${n} na festa`;
   Fx.setSounds(s.fx.sounds);
   renderSoundBoard($("fx-sounds"), s.fx, { keys: true });
-  Fx.setVolume(s.config.fx_volume ?? 0.7);
+  Fx.setVolume(deviceGet("fx_volume"));
   renderAlert();
   renderHero();
   renderStageQueue();
@@ -294,7 +298,7 @@ function openSong(s) {
 
 async function separateNow(s) {
   const p = STATE.providers.find((x) => x.name === STATE.config.provider);
-  if (!p || p.name === "none" || p.problem) {
+  if (STATE.is_admin && (!p || p.name === "none" || p.problem)) {
     toast("Escolha e configure um serviço de separação primeiro.", true);
     openSettings();
     return;
@@ -470,21 +474,34 @@ function youtubeCookiesBox() {
     h("div", { style: "display:flex; gap:8px; margin-top:10px" }, send, remove, file));
 }
 
-async function openSettings() {
-  const { config: cfg, providers } = await api("/api/config");
-  const body = $("settings-body");
-  body.replaceChildren(
+function partySection() {
+  const restart = h("button", { class: "btn ghost", type: "button", onclick: () => {
+    if (confirm("Começar uma festa nova? A fila e os votos desta ficam para trás, e os convidados entram de novo pelo QR novo.")) restartParty().catch((e) => toast(e.message, true));
+  } }, "Começar uma festa nova");
+  return [
     h("div", { class: "dlg-section" }, "FESTA"),
-    h("label", { class: "field" }, h("span", {}, "Seu nome na fila (quando você pede pelo notebook)"),
-      h("input", { type: "text", id: "host-name", value: cfg.host_name || "", maxlength: "24" })),
-    h("label", { class: "field" }, h("span", {}, "Volume dos efeitos sonoros"),
-      h("input", { type: "range", id: "fx-volume", min: "0", max: "1", step: "0.05", value: cfg.fx_volume ?? 0.7 })),
-    h("div", { class: "hint", style: "margin:-6px 0 4px" }, "Quer o som de verdade de algum efeito? Coloque um arquivo em data/fx com o nome dele (aplausos.mp3, buzina.mp3, errou.mp3…)."),
+    h("label", { class: "field" }, h("span", {}, "Seu nome na fila (quando você pede pelo telão)"),
+      h("input", { type: "text", id: "host-name", value: (STATE.room && STATE.room.host_name) || "", maxlength: "24" })),
+    h("label", { class: "field" }, h("span", {}, "Volume dos efeitos sonoros (neste aparelho)"),
+      h("input", { type: "range", id: "fx-volume", min: "0", max: "1", step: "0.05", value: deviceGet("fx_volume") })),
     h("label", { class: "field", style: "margin-top:12px" }, h("span", {}, "Atraso da caixa Bluetooth (segundos): a letra espera esse tempo"),
-      h("input", { type: "number", id: "bt-delay", step: "0.05", min: "0", max: "2", value: cfg.bt_delay, style: "width:120px" })),
-    h("div", { class: "dlg-section" }, "YOUTUBE"),
+      h("input", { type: "number", id: "bt-delay", step: "0.05", min: "0", max: "2", value: deviceGet("bt_delay"), style: "width:120px" })),
+    h("div", { class: "hint", style: "margin:-6px 0 10px" }, `Código desta festa: ${STATE.room ? STATE.room.id : "—"}. Os convidados entram pelo QR do telão.`),
+    restart,
+  ];
+}
+
+async function openSettings() {
+  const body = $("settings-body");
+  body.replaceChildren(...partySection());
+  $("fx-volume").addEventListener("input", (e) => Fx.setVolume(parseFloat(e.target.value)));
+  $("fx-volume").addEventListener("change", () => Fx.play(STATE.fx.favorites[0]));
+  if (!STATE.is_admin) { $("settings").showModal(); return; }
+  const { config: cfg, providers } = await api("/api/config");
+  body.append(
+    h("div", { class: "dlg-section" }, "YOUTUBE (SERVIDOR)"),
     youtubeCookiesBox(),
-    h("div", { class: "dlg-section" }, "SEPARAÇÃO DE VOZ"),
+    h("div", { class: "dlg-section" }, "SEPARAÇÃO DE VOZ (SERVIDOR)"),
   );
   for (const p of providers) {
     const meta = PROVIDER_FIELDS[p.name] || { fields: [], help: "" };
@@ -517,8 +534,6 @@ async function openSettings() {
   body.querySelectorAll("input[name=provider]").forEach((r) => r.addEventListener("change", () => {
     body.querySelectorAll(".prov").forEach((b) => b.classList.toggle("active", b.contains(r) && r.checked));
   }));
-  $("fx-volume").addEventListener("input", (e) => Fx.setVolume(parseFloat(e.target.value)));
-  $("fx-volume").addEventListener("change", () => Fx.play(STATE.fx.favorites[0]));
   $("settings").showModal();
 }
 
@@ -526,19 +541,19 @@ $("open-settings").addEventListener("click", () => openSettings().catch((e) => t
 
 $("save-settings").addEventListener("click", async () => {
   const body = $("settings-body");
-  const values = {
-    provider: body.querySelector("input[name=provider]:checked")?.value,
-    split_backing: $("split-backing").checked,
-    bt_delay: parseFloat($("bt-delay").value) || 0,
-    host_name: $("host-name").value.trim() || "Anfitrião",
-    fx_volume: parseFloat($("fx-volume").value),
-  };
-  body.querySelectorAll("input[data-key]").forEach((i) => {
-    const key = i.dataset.key;
-    if (SECRET.has(key) && !i.value) return;
-    values[key] = i.type === "number" ? parseInt(i.value, 10) : i.value.trim();
-  });
+  deviceSet({ bt_delay: Math.max(0, parseFloat($("bt-delay").value) || 0), fx_volume: parseFloat($("fx-volume").value) });
   try {
+    await api("/api/room", { method: "PATCH", body: { host_name: $("host-name").value.trim() } });
+    if (!STATE.is_admin) { $("settings").close(); toast("Ajustes salvos."); return; }
+    const values = {
+      provider: body.querySelector("input[name=provider]:checked")?.value,
+      split_backing: $("split-backing").checked,
+    };
+    body.querySelectorAll("input[data-key]").forEach((i) => {
+      const key = i.dataset.key;
+      if (SECRET.has(key) && !i.value) return;
+      values[key] = i.type === "number" ? parseInt(i.value, 10) : i.value.trim();
+    });
     const res = await api("/api/config", { method: "POST", body: values });
     $("settings").close();
     loadUsage(true);

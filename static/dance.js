@@ -327,7 +327,7 @@ $("seek").addEventListener("input", () => { seeking = true; $("time-now").textCo
 $("seek").addEventListener("change", () => { seeking = false; seek($("seek").value / 1000 * clip.duration); });
 $("master").addEventListener("input", () => { clip.volume = parseFloat($("master").value); });
 $("fx-vol").addEventListener("input", () => Fx.setVolume(parseFloat($("fx-vol").value)));
-$("fx-vol").addEventListener("change", () => api("/api/config", { method: "POST", body: { fx_volume: parseFloat($("fx-vol").value) } }).catch(() => {}));
+$("fx-vol").addEventListener("change", () => deviceSet({ fx_volume: parseFloat($("fx-vol").value) }));
 
 const CAM_SIZES = ["sm", "md", "lg", "off"];
 function setCamSize(size) {
@@ -595,7 +595,7 @@ async function init() {
   $("song-title-2").textContent = `${song.title} · ${song.artist}`;
   $("song-only").hidden = Boolean(ENTRY_ID);
   $("ready-title").textContent = song.title.toUpperCase();
-  $("fx-vol").value = (state.config && state.config.fx_volume) ?? 0.7;
+  $("fx-vol").value = deviceGet("fx_volume");
   Fx.setVolume(parseFloat($("fx-vol").value));
   let size = "md";
   try { size = localStorage.getItem("dance-cam-size") || size; } catch (e) {}
