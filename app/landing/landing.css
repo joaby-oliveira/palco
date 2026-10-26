@@ -38,6 +38,8 @@ main:focus { outline: none; }
 
 .wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding-inline: 20px; }
 main > section { padding-block: clamp(48px, 8vw, 96px); }
+/* Seções fora da tela só são montadas quando chegam perto: o primeiro desenho fica bem mais leve */
+main > section:not(.hero) { content-visibility: auto; contain-intrinsic-size: auto 900px; }
 .band { position: relative; z-index: 1; background: rgba(28, 18, 48, .72); border-block: 1px solid var(--line); }
 
 /* Botões */
@@ -74,14 +76,14 @@ main > section { padding-block: clamp(48px, 8vw, 96px); }
 @media (min-width: 960px) { .split { grid-template-columns: 1fr 1fr; } }
 
 /* Vídeo (ou o roteiro dele, enquanto não foi gravado) */
-.video { margin: 0; container-type: inline-size; }
+.video { margin: 0; }
 .video .frame { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: #000; border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0, 0, 0, .45); }
 .video video, .video iframe, .video .yt img { width: 100%; height: 100%; object-fit: cover; border: 0; display: block; }
 .video .yt { display: block; width: 100%; height: 100%; }
 .video .yt-play { position: absolute; inset: 50% auto auto 50%; translate: -50% -50%; width: 76px; height: 76px; border-radius: 50%; background: var(--gold); box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
 .video .yt-play::after { content: ""; position: absolute; left: 30px; top: 22px; border-style: solid; border-width: 16px 0 16px 26px; border-color: transparent transparent transparent var(--gold-ink); }
 .video figcaption { margin-top: 10px; color: var(--muted); font-size: 15px; }
-.video.script .frame { overflow: visible; display: flex; flex-direction: column; justify-content: center; gap: .5em; padding: clamp(16px, 5cqi, 34px); background: radial-gradient(120% 90% at 20% 0%, #3A2160 0%, var(--surface) 55%, #140C22 100%); border: 2px dashed var(--line); box-shadow: none; font-size: clamp(14px, 3.1cqi, 18px); line-height: 1.4; }
+.video.script .frame { overflow: visible; display: flex; flex-direction: column; justify-content: center; gap: .5em; padding: clamp(16px, 3vw, 34px); background: radial-gradient(120% 90% at 20% 0%, #3A2160 0%, var(--surface) 55%, #140C22 100%); border: 2px dashed var(--line); box-shadow: none; font-size: clamp(14px, 1.5vw + 8px, 17px); line-height: 1.4; }
 .video.script .soon { position: absolute; top: 12px; right: 12px; margin: 0; font-size: 13px; font-weight: 700; color: var(--gold-ink); background: var(--gold); border-radius: 999px; padding: 2px 10px; }
 .video.script .r-title { margin: 0 0 .2em; padding-right: 110px; font-family: var(--display); color: var(--gold); font-size: 1.05em; }
 .video.script .dur { white-space: nowrap; font-family: var(--body); color: var(--muted); font-weight: 600; font-size: .85em; }
