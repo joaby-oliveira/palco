@@ -3,6 +3,7 @@ import asyncio
 import hmac
 import io
 import json
+import mimetypes
 import os
 import socket
 from pathlib import Path
@@ -12,12 +13,15 @@ import qrcode
 import qrcode.image.svg
 from fastapi import Body, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import accounts, billing, camlink, config, dance, duel, metadata, party, plans, providers, store, usage, worker, youtube
+from . import accounts, billing, camlink, config, dance, duel, landing, metadata, party, plans, providers, store, usage, worker, youtube
 
 STATIC = config.ROOT / "static"
+mimetypes.add_type("font/woff2", ".woff2")  # o Windows nem sempre conhece
 STEMS = {"original", "instrumental", "lead", "backing"}
 
 app = FastAPI(title="Karaoke")
@@ -28,6 +32,7 @@ app = FastAPI(title="Karaoke")
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
 HOST_KEY = os.environ.get("HOST_KEY", "")
 HOST_COOKIE = "palco_host"
+TELAO_COOKIE = "palco_telao"  # este navegador já abriu o telão (a TV da festa): a raiz leva direto para ele
 
 
 def code_version() -> float:
@@ -45,8 +50,22 @@ async def no_cache_pages(request: Request, call_next):
     # O navegador sempre confere se as páginas e scripts mudaram (senão roda código velho depois de uma atualização)
     response = await call_next(request)
     path = request.url.path
-    if path.startswith(("/static", "/play/", "/review/")) or path in ("/", "/m", "/cam", "/conta"):
+    if path.startswith("/static/fonts/"):
+        # Fontes não mudam (trocou o arquivo, troca o nome)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif path.startswith("/static/site/"):
+        response.headers["Cache-Control"] = "public, max-age=86400"
+    elif path.startswith(("/static", "/play/", "/review/")) or path in ("/", "/telao", "/m", "/cam", "/conta"):
         response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@app.middleware("http")
+async def noindex_app(request: Request, call_next):
+    # No Google só entra a página de vendas; as telas do app (telão, celular, conta...) ficam de fora
+    response = await call_next(request)
+    if request.url.path != "/" and response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["X-Robots-Tag"] = "noindex"
     return response
 
 
@@ -265,13 +284,50 @@ def _song_or_404(song_id: str) -> dict:
 # ---------- Páginas ----------
 
 @app.get("/")
-def index(host: str = ""):
+def landing_page(request: Request, host: str = ""):
     # /?host=CHAVE vira este navegador no notebook do anfitrião (fica num cookie)
     if host and HOST_KEY and hmac.compare_digest(host.encode(), HOST_KEY.encode()):
-        response = RedirectResponse("/", status_code=303)
+        response = RedirectResponse("/telao", status_code=303)
         response.set_cookie(HOST_COOKIE, HOST_KEY, max_age=60 * 60 * 24 * 365, httponly=True, secure=True, samesite="lax")
         return response
-    return FileResponse(STATIC / "index.html")
+    # Quem já usa o telão neste navegador não cai na página de vendas; /?site mostra ela mesmo assim
+    if "site" not in request.query_params and (request.cookies.get(TELAO_COOKIE) or request.cookies.get(HOST_COOKIE)):
+        return RedirectResponse("/telao", status_code=302, headers={"Vary": "Cookie", "Cache-Control": "no-cache"})
+    return landing.response(request, base_url(request))
+
+
+@app.get("/telao")
+def index(request: Request):
+    response = FileResponse(STATIC / "index.html")
+    # Só marca o navegador de quem usa o telão de verdade (logado ou dono), não o de quem só veio olhar
+    if account_of(request) or is_admin(request):
+        response.set_cookie(TELAO_COOKIE, "1", max_age=60 * 60 * 24 * 365, secure=PUBLIC_URL.startswith("https"), samesite="lax")
+    return response
+
+
+@app.get("/robots.txt")
+def robots(request: Request):
+    return Response(landing.robots(base_url(request)), media_type="text/plain")
+
+
+@app.get("/sitemap.xml")
+def sitemap(request: Request):
+    return Response(landing.sitemap(base_url(request)), media_type="application/xml")
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse(STATIC / "site" / "favicon.ico", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/apple-touch-icon.png")
+def apple_touch_icon():
+    return FileResponse(STATIC / "site" / "apple-touch-icon.png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/site.webmanifest")
+def webmanifest():
+    return FileResponse(STATIC / "site" / "site.webmanifest", media_type="application/manifest+json")
 
 
 @app.get("/conta")
@@ -979,6 +1035,22 @@ def set_config(request: Request, values: dict = Body(...)):
     usage.invalidate()
     store.touch()
     return {"config": config.public(), "providers": providers.listing()}
+
+
+@app.exception_handler(StarletteHTTPException)
+async def not_found_page(request: Request, exc: StarletteHTTPException):
+    # Endereço que não existe, aberto no navegador: página de 404 com caminho de volta (a API segue em JSON)
+    path = request.url.path
+    if exc.status_code == 404 and not path.startswith(("/api/", "/media/", "/static/")) and "text/html" in request.headers.get("accept", ""):
+        return HTMLResponse(NOT_FOUND, status_code=404)
+    return await http_exception_handler(request, exc)
+
+
+NOT_FOUND = """<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Página não encontrada · Palco</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#110A1C;color:#FBF6FF;font:18px/1.5 system-ui,sans-serif;text-align:center;padding:20px}
+a{display:inline-block;margin-top:12px;padding:12px 22px;border-radius:999px;background:#FFC93C;color:#1A0F00;font-weight:800;text-decoration:none}</style></head>
+<body><main><h1>Essa página não existe</h1><p>O endereço pode ter mudado.</p><a href="/">Ir para o Palco</a></main></body></html>"""
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

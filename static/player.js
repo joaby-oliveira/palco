@@ -582,11 +582,11 @@ function renderFinalNext() {
   if (n && finalCount > 0) btn.append(h("span", { class: "count" }, finalCount));
   btn.onclick = async () => {
     clearInterval(finalTimer);
-    if (!n) { location.href = "/"; return; }
+    if (!n) { location.href = "/telao"; return; }
     try {
       const entry = await api("/api/stage/start", { method: "POST", body: { entry_id: n.id } });
       location.href = `/play/${entry.song_id}?entry=${entry.id}`;
-    } catch (err) { toast(err.message, true); location.href = "/"; }
+    } catch (err) { toast(err.message, true); location.href = "/telao"; }
   };
 }
 

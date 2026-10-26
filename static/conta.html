@@ -9,19 +9,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/static/style.css?v=7">
-<link rel="stylesheet" href="/static/conta.css?v=2">
+<link rel="stylesheet" href="/static/conta.css?v=3">
 </head>
 <body>
 <div class="beams" aria-hidden="true"><span></span><span></span></div>
 
 <div class="wrap conta">
   <header class="top">
-    <a class="brand" href="/" aria-label="Palco, voltar para o telão">
+    <a class="brand" href="/telao" aria-label="Palco, voltar para o telão">
       <img src="/static/disco.svg" width="44" height="48" alt="">
       <span><span class="name">PALCO</span><span class="tag" style="display:block">minha conta</span></span>
     </a>
     <div class="top-actions">
-      <a class="btn ghost sm" href="/"><i data-icon="back" data-size="16"></i>Voltar para o telão</a>
+      <a class="btn ghost sm" href="/telao"><i data-icon="back" data-size="16"></i>Voltar para o telão</a>
     </div>
   </header>
 
@@ -34,6 +34,7 @@
       <button type="button" data-auth="login" class="on" aria-pressed="true">Entrar</button>
       <button type="button" data-auth="register" aria-pressed="false">Criar conta</button>
     </div>
+    <p class="auth-pick" id="auth-pick" hidden></p>
     <form id="auth-form">
       <label class="field reg-only"><span>Nome</span><input type="text" name="name" autocomplete="name" maxlength="60"></label>
       <label class="field"><span>E-mail</span><input type="text" name="email" inputmode="email" autocomplete="email" required></label>
@@ -85,6 +86,6 @@
 </div>
 
 <script src="/static/common.js?v=7"></script>
-<script src="/static/conta.js?v=1"></script>
+<script src="/static/conta.js?v=2"></script>
 </body>
 </html>

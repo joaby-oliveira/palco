@@ -5,6 +5,8 @@ fillIcons();
 
 let DATA = null;
 let authMode = "login";
+// Veio da página de vendas com um plano escolhido (/conta?plano=animador)
+let PICK = new URLSearchParams(location.search).get("plano");
 const brl = (cents) => (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const when = (ts) => new Date(ts * 1000).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const day = (ts) => new Date(ts * 1000).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
@@ -18,12 +20,26 @@ function render() {
   const acc = DATA.account;
   $("auth").hidden = !!acc;
   $("me").hidden = !acc;
+  const picked = PICK && DATA.plans.find((p) => p.id === PICK);
+  $("auth-pick").hidden = !picked;
+  if (picked) $("auth-pick").textContent = `Crie a sua conta (ou entre) para comprar o ${picked.name}.`;
   if (!acc) return;
   $("hello").textContent = `OLÁ, ${acc.name.split(" ")[0].toUpperCase()}`;
   renderAccess();
   renderPlans();
   renderProfile();
   renderOrders();
+  showPicked();
+}
+
+// Depois de entrar, leva até o plano escolhido e deixa o botão de compra no foco
+function showPicked() {
+  const card = PICK && document.querySelector(`.plan[data-plan="${CSS.escape(PICK)}"]`);
+  PICK = null;
+  if (!card) return;
+  card.classList.add("picked");
+  card.scrollIntoView({ block: "center" });
+  card.querySelector("button")?.focus({ preventScroll: true });
 }
 
 // ---------- Entrar / criar conta ----------
@@ -58,7 +74,7 @@ $("logout").addEventListener("click", async () => {
 // Veio do telão para entrar: volta para ele assim que a conta estiver pronta
 function afterLogin() {
   const back = new URLSearchParams(location.search).get("voltar");
-  if (back === "telao" && DATA.access && (DATA.access.active || DATA.access.unused_passes.length)) location.href = "/";
+  if (back === "telao" && DATA.access && (DATA.access.active || DATA.access.unused_passes.length)) location.href = "/telao";
 }
 
 // ---------- Acesso atual ----------
@@ -139,7 +155,7 @@ function features(p) {
 function planCard(p) {
   const a = DATA.access;
   const isCurrent = p.kind === "monthly" && a.subscription && a.subscription.status === "active" && a.subscription.plan === p.id;
-  const card = h("div", { class: `plan${p.featured ? " featured" : ""}` },
+  const card = h("div", { class: `plan${p.featured ? " featured" : ""}`, "data-plan": p.id },
     p.featured ? h("span", { class: "ribbon" }, "MAIS ESCOLHIDO") : null,
     h("div", { class: "pname" }, p.name),
     h("div", { class: "sub" }, p.pitch),
@@ -226,7 +242,7 @@ async function waitPayment(orderId) {
       box.replaceChildren(h("div", {},
         h("b", {}, "Pagamento confirmado!"),
         h("div", { class: "sub" }, isPass ? "Seu passe está guardado. Aperte Começar a festa agora quando a festa for começar." : "Seu plano está ativo. É só voltar para o telão."),
-        h("div", { style: "margin-top:10px" }, h("a", { class: "btn sm", href: "/" }, "Ir para o telão"))));
+        h("div", { style: "margin-top:10px" }, h("a", { class: "btn sm", href: "/telao" }, "Ir para o telão"))));
       history.replaceState(null, "", "/conta");
       await load();
       return;
@@ -236,6 +252,8 @@ async function waitPayment(orderId) {
   box.replaceChildren(h("div", {}, h("b", {}, "O pagamento ainda não caiu."),
     h("div", { class: "sub" }, "Assim que o pagamento for confirmado, o plano aparece aqui sozinho. Pode fechar esta página.")));
 }
+
+if (PICK) document.querySelector('[data-auth="register"]').click();
 
 load().then(() => {
   const pedido = new URLSearchParams(location.search).get("pedido");

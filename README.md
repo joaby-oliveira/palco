@@ -11,7 +11,8 @@ A v1 (visual antigo, sem fila da festa) está na branch `v1`.
 ## Como usar
 
 1. Dê dois cliques em `iniciar.bat`. Ele instala tudo na primeira vez, atualiza
-   o yt-dlp e abre http://localhost:8000.
+   o yt-dlp e abre o telão em http://localhost:8000/telao (a raiz `/` é a
+   página de vendas).
 2. Em **Ajustes** (ícone no canto de cima), cole o token do MVSEP
    (https://mvsep.com/user-api).
 3. A galera escaneia o QR **Chama a galera**, diz o nome e pede música. Do
@@ -243,7 +244,7 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
   zera a fila e troca o código.
 - `HOST_KEY`: chave do dono do servidor. Abrindo
   `https://palco.seudominio.com/?host=uma-chave-longa` uma vez (fica num
-  cookie por um ano), aparecem nos ajustes as partes do servidor: separação
+  cookie por um ano e leva para o telão), aparecem nos ajustes as partes do servidor: separação
   de voz, tokens e cookies do YouTube. Também pode apagar qualquer música do
   repertório. No notebook (localhost) isso vale sem chave.
 - `HTTPS_PORT=0` (já é o padrão da imagem): sem a porta 8443 com certificado
@@ -255,6 +256,26 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
   LOCALLY" e feche a janela sem sair da conta. O app testa na hora se o
   YouTube liberou. Os cookies vencem de tempos em tempos; quando o download
   voltar a falhar, a mensagem de erro avisa para enviar de novo.
+
+### Página de vendas
+
+A raiz do site (`/`) é a página de vendas; o telão fica em `/telao`. Quem já
+usa o telão naquele navegador (logado ou dono do servidor) vai direto para
+ele ao abrir a raiz; `/?site` mostra a página mesmo assim.
+
+- O texto está em `app/landing/template.html` e o estilo em
+  `app/landing/landing.css` (vai inline na página). Os preços e os planos vêm
+  do `app/plans.py`; cada botão leva para `/conta?plano=ID`, que já abre com o
+  plano escolhido.
+- **Vídeos**: em `VIDEOS`, no `app/landing/__init__.py`. Enquanto um vídeo não
+  tem `src` nem `youtube`, o lugar dele mostra o roteiro para gravar. Para
+  publicar, ponha o `.mp4`, o pôster (1280x720) e a legenda `.vtt` em
+  `static/videos/` e preencha `src`, `poster`, `legenda` e `enviado` (ou só
+  `youtube` com o ID e `enviado`).
+- Contato no rodapé: variáveis `CONTATO_EMAIL` e `CONTATO_WHATSAPP` (só
+  números, com 55 e DDD).
+- Só a página de vendas entra no Google: as telas do app respondem com
+  `X-Robots-Tag: noindex`. `/robots.txt` e `/sitemap.xml` saem do servidor.
 
 ### Cobrança: passe por festa e planos mensais
 
