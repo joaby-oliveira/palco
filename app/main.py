@@ -15,7 +15,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import camlink, config, dance, duel, metadata, party, providers, store, usage, worker, youtube
+from . import accounts, billing, camlink, config, dance, duel, metadata, party, plans, providers, store, usage, worker, youtube
 
 STATIC = config.ROOT / "static"
 STEMS = {"original", "instrumental", "lead", "backing"}
@@ -45,7 +45,7 @@ async def no_cache_pages(request: Request, call_next):
     # O navegador sempre confere se as páginas e scripts mudaram (senão roda código velho depois de uma atualização)
     response = await call_next(request)
     path = request.url.path
-    if path.startswith(("/static", "/play/", "/review/")) or path in ("/", "/m", "/cam"):
+    if path.startswith(("/static", "/play/", "/review/")) or path in ("/", "/m", "/cam", "/conta"):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -70,6 +70,8 @@ def _activate():
     config.load()
     store.load()
     party.load()
+    accounts.load()
+    billing.load()
     worker.start()
     _active = True
     if _standby_flag:
@@ -161,7 +163,81 @@ def is_room_host(request) -> bool:
     return room_of(request)[1]
 
 
-def state(room: party.Room | None, host: bool, admin: bool, client: str = "") -> dict:
+# ---------- Cobrança: quem paga a festa ----------
+
+def account_of(request) -> dict | None:
+    return accounts.from_token(request.cookies.get(accounts.COOKIE))
+
+
+def base_url(request) -> str:
+    return PUBLIC_URL or str(request.base_url).rstrip("/")
+
+
+GATE_MESSAGES = {
+    "login": "Para começar a festa, entre na sua conta e escolha um passe ou plano.",
+    "none": "A festa ainda não foi liberada. Escolha um passe ou plano em Minha conta.",
+    "unused": "Você tem um passe guardado. Aperte para começar a contar as horas da festa.",
+    "expired": "O passe ou plano desta festa acabou. Renove em Minha conta para continuar.",
+}
+GUEST_GATE = "A festa ainda não foi liberada pelo anfitrião. Peça para ele ativar no telão."
+
+
+def room_access(room: party.Room | None) -> dict:
+    """Se a festa pode usar o Palco agora. Sem cobrança, no notebook ou na festa do dono, sempre pode."""
+    if not billing.enabled() or not room or room.free:
+        return {"ok": True}
+    acc = accounts.get(room.account)
+    if not acc:
+        return {"ok": False, "reason": "login"}
+    a = billing.access(acc)
+    if a["active"]:
+        return {"ok": True, "account": acc, "access": a}
+    reason = "unused" if a["unused_passes"] else ("expired" if acc["passes"] or acc.get("subscription") else "none")
+    return {"ok": False, "reason": reason, "account": acc, "access": a}
+
+
+def need_access(room: party.Room | None, host: bool, new_song: bool = False, dance_mode: bool = False) -> dict:
+    """Barra (402) o que a festa não pode fazer agora; devolve o acesso para contar o uso."""
+    gate = room_access(room)
+    if not gate["ok"]:
+        raise HTTPException(402, GATE_MESSAGES[gate["reason"]] if host else GUEST_GATE)
+    a = gate.get("access")
+    if not a:
+        return gate
+    if dance_mode and not a["limits"]["dance"]:
+        raise HTTPException(402, f"O modo dança não está no plano {a['name']}. Dá para trocar de plano em Minha conta.")
+    if new_song and a["songs_left"] == 0:
+        msg = f"As {a['limits']['songs']} músicas novas do plano {a['name']} acabaram. Músicas que já estão no repertório continuam liberadas."
+        raise HTTPException(402, msg if host else "Acabaram as músicas novas do plano da festa. Escolha uma que já está pronta.")
+    return gate
+
+
+def attach_room(room: party.Room, acc: dict):
+    """O telão de quem está logado vira festa da conta. Passou do número de telões do plano: o mais antigo sai."""
+    if room.account == acc["id"]:
+        return
+    room.set_owner(account=acc["id"])
+    a = billing.access(acc)
+    screens = a["limits"]["screens"] if a.get("active") else 1
+    others = sorted((r for r in party.rooms_of(acc["id"]) if r.id != room.id), key=lambda r: r.touched)
+    for old in others[:max(0, len(others) + 1 - screens)]:
+        old.set_owner(account="")
+
+
+def billing_state(room: party.Room | None, host: bool, acc: dict | None) -> dict:
+    if not billing.enabled():
+        return {"enabled": False}
+    gate = room_access(room)
+    out = {"enabled": True, "ok": gate["ok"], "reason": gate.get("reason"),
+           "message": None if gate["ok"] else (GATE_MESSAGES[gate["reason"]] if host else GUEST_GATE)}
+    if host:
+        out["account"] = accounts.public(acc) if acc else None
+        out["access"] = billing.access(acc) if acc else {"active": False}
+        out["free"] = bool(room and room.free)
+    return out
+
+
+def state(room: party.Room | None, host: bool, admin: bool, client: str = "", acc: dict | None = None) -> dict:
     public = {"provider": config.get("provider"), "dance_params": config.get("dance_params")}
     return {
         "songs": store.snapshot(),
@@ -175,6 +251,7 @@ def state(room: party.Room | None, host: bool, admin: bool, client: str = "") ->
         "needs_restart": admin and code_version() > CODE_AT_START,
         "party": room.snapshot(client) if room else party.empty_snapshot(client),
         "fx": {"sounds": party.sounds(), "favorites": party.favorites()},
+        "billing": billing_state(room, host, acc),
     }
 
 
@@ -195,6 +272,11 @@ def index(host: str = ""):
         response.set_cookie(HOST_COOKIE, HOST_KEY, max_age=60 * 60 * 24 * 365, httponly=True, secure=True, samesite="lax")
         return response
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/conta")
+def account_page():
+    return FileResponse(STATIC / "conta.html")
 
 
 @app.get("/m")
@@ -222,9 +304,13 @@ def player(song_id: str):
 # ---------- Estado em tempo real ----------
 
 @app.post("/api/rooms")
-def create_room():
+def create_room(request: Request):
     """Festa nova: quem abre o telão vira o anfitrião dela (guarda a chave no navegador)."""
     room = party.create()
+    if is_admin(request):
+        room.set_owner(free=True)
+    elif acc := account_of(request):
+        attach_room(room, acc)
     return {"id": room.id, "token": room.token}
 
 
@@ -248,15 +334,30 @@ def add_person(request: Request, body: dict = Body(...)):
 @app.get("/api/state")
 def get_state(request: Request):
     room, host = room_of(request)
-    return state(room, host, is_admin(request), client_id(request))
+    admin, acc = is_admin(request), account_of(request)
+    if room and host:
+        # A festa é de quem está no telão: o dono do servidor (grátis) ou a conta logada
+        if admin and not room.free:
+            room.set_owner(free=True)
+        elif acc and not admin:
+            attach_room(room, acc)
+    return state(room, host, admin, client_id(request), acc)
 
 
 @app.websocket("/ws")
 async def ws(socket_: WebSocket):
     await socket_.accept()
     room, host = room_of(socket_)
-    admin = is_admin(socket_)
+    admin, acc = is_admin(socket_), account_of(socket_)
     client = socket_.query_params.get("client") or "anon"
+    if room and not host:
+        # Festa cheia (limite de convidados do plano): o celular novo não entra
+        gate = room_access(room)
+        limit = gate["access"]["limits"]["guests"] if gate.get("access") else None
+        if not room.admit(client, limit):
+            await socket_.send_json({"blocked": f"A festa está cheia: o plano do anfitrião vai até {limit} celulares."})
+            await socket_.close()
+            return
     # Quem conta como "na festa" são os celulares; o telão não entra na conta
     if room and not host:
         room.connected(client, 1)
@@ -267,7 +368,7 @@ async def ws(socket_: WebSocket):
         while True:
             if store.version != seen:
                 seen = store.version
-                await socket_.send_json(state(room, host, admin, client))
+                await socket_.send_json(state(room, host, admin, client, acc))
             if room and room.fx_event["seq"] != fx_seen:
                 fx_seen = room.fx_event["seq"]
                 await socket_.send_json({"fx_event": room.fx_event})
@@ -325,6 +426,139 @@ def qr(target: str = "", sala: str = ""):
     buf = io.BytesIO()
     img.save(buf)
     return Response(buf.getvalue(), media_type="image/svg+xml")
+
+
+# ---------- Conta e pagamento (passe por festa e planos mensais) ----------
+
+def _login_response(acc: dict) -> Response:
+    response = Response(json.dumps(accounts.public(acc)), media_type="application/json")
+    response.set_cookie(accounts.COOKIE, accounts.new_session(acc), max_age=accounts.SESSION_TTL, httponly=True,
+                        secure=PUBLIC_URL.startswith("https"), samesite="lax")
+    return response
+
+
+def need_account(request) -> dict:
+    acc = account_of(request)
+    if not acc:
+        raise HTTPException(401, "Entre na sua conta primeiro.")
+    return acc
+
+
+@app.get("/api/account")
+def get_account(request: Request):
+    acc = account_of(request)
+    return {
+        "billing": billing.enabled(),
+        "account": accounts.public(acc) if acc else None,
+        "access": billing.access(acc) if acc else None,
+        "plans": plans.public(),
+        "brokers": [{"name": b.name, "label": b.label} for b in billing.available()],
+        "orders": [{k: o.get(k) for k in ("id", "plan", "price", "provider", "status", "created")}
+                   for o in billing.orders_of(acc)][:20] if acc else [],
+    }
+
+
+@app.post("/api/account/register")
+def register(body: dict = Body(...)):
+    try:
+        acc = accounts.create(str(body.get("email", "")), str(body.get("password", "")), str(body.get("name", "")),
+                              str(body.get("phone", "")), str(body.get("tax_id", "")))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _login_response(acc)
+
+
+@app.post("/api/account/login")
+def login(body: dict = Body(...)):
+    try:
+        acc = accounts.login(str(body.get("email", "")), str(body.get("password", "")))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _login_response(acc)
+
+
+@app.post("/api/account/logout")
+def logout(request: Request):
+    accounts.end_session(request.cookies.get(accounts.COOKIE, ""))
+    response = Response('{"ok": true}', media_type="application/json")
+    response.delete_cookie(accounts.COOKIE)
+    return response
+
+
+@app.patch("/api/account")
+def patch_account(request: Request, body: dict = Body(...)):
+    return accounts.public(accounts.update_profile(need_account(request), body))
+
+
+@app.post("/api/billing/checkout")
+async def billing_checkout(request: Request, body: dict = Body(...)):
+    acc = need_account(request)
+    try:
+        order = await run_in_threadpool(billing.checkout, acc, str(body.get("plan", "")), body.get("provider"), base_url(request))
+    except (KeyError, ValueError) as e:
+        raise HTTPException(400, str(e.args[0]))
+    except (RuntimeError, httpx.HTTPError) as e:
+        raise HTTPException(502, f"Não consegui abrir o pagamento: {e}")
+    return {"id": order["id"], "url": order["url"]}
+
+
+@app.get("/api/billing/orders/{order_id}")
+async def billing_order(order_id: str, request: Request):
+    acc = need_account(request)
+    order = billing.order(order_id)
+    if not order or order["account"] != acc["id"]:
+        raise HTTPException(404, "Pedido não encontrado.")
+    await run_in_threadpool(billing.sync, order)
+    return {"id": order["id"], "plan": order["plan"], "status": order["status"], "access": billing.access(acc)}
+
+
+@app.post("/api/billing/pass/start")
+def billing_start_pass(request: Request):
+    acc = need_account(request)
+    try:
+        billing.start_pass(acc)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    store.touch()
+    return billing.access(acc)
+
+
+@app.post("/api/billing/cancel")
+async def billing_cancel(request: Request):
+    acc = need_account(request)
+    try:
+        await run_in_threadpool(billing.cancel_subscription, acc)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except (RuntimeError, httpx.HTTPError) as e:
+        raise HTTPException(502, f"Não consegui cancelar: {e}")
+    return billing.access(acc)
+
+
+@app.get("/api/billing/portal")
+async def billing_portal(request: Request):
+    url = await run_in_threadpool(billing.portal, need_account(request))
+    if not url:
+        raise HTTPException(404, "Esse pagamento não tem portal do cliente.")
+    return {"url": url}
+
+
+@app.post("/api/billing/webhook/{provider}")
+async def billing_webhook(provider: str, request: Request):
+    broker = billing.BROKERS.get(provider)
+    if not broker:
+        raise HTTPException(404)
+    body = await request.body()
+    try:
+        events = await run_in_threadpool(broker.parse_webhook, request.headers, dict(request.query_params), body)
+    except billing.Unauthorized:
+        raise HTTPException(401)
+    except ValueError:
+        raise HTTPException(400)
+    for event in events:
+        billing.apply(event, provider)
+    store.touch()
+    return {"ok": True}
 
 
 # ---------- Busca e fila ----------
@@ -386,10 +620,14 @@ def add_song(request: Request, video: dict = Body(...)):
     # Com/sem backing vocals: escolhido na hora de adicionar; sem escolha, vale o padrão do ⚙
     backing = video.get("backing")
     want_backing = None if backing is None or kind != "original" else bool(backing)
+    room, host = room_of(request)
+    new = not store.find_video(video.get("id", ""), kind)
+    gate = {} if is_admin(request) else need_access(room, host, new_song=new, dance_mode=kind == "dance")
     song = store.add(video, artist, title, client_id(request), kind, want_backing)
+    if new and gate.get("account"):
+        billing.record_song(gate["account"])
     # Pedido de música: já entra na fila da festa com o nome de quem pediu
     if video.get("queue"):
-        room, host = room_of(request)
         if room:
             room.enqueue(song["id"], client_id(request), host)
     return song
@@ -457,10 +695,11 @@ def set_me(request: Request, body: dict = Body(...)):
 def stage_add(request: Request, body: dict = Body(...)):
     """Entra na fila para cantar uma música da biblioteca. Com rival, é um duelo;
     o telão do anfitrião também escolhe quem é o cantor A (client)."""
-    _song_or_404(str(body.get("song_id")))
     room, host = room_of(request)
     if not room:
         need_room(request)
+    need_access(room, host)
+    _song_or_404(str(body.get("song_id")))
     client = (host and body.get("client")) or client_id(request)
     try:
         return room.enqueue(body["song_id"], client, host and client == client_id(request), body.get("rival") or None)
@@ -490,6 +729,7 @@ def stage_later(entry_id: str, request: Request):
 def stage_start(request: Request, body: dict = Body(...)):
     """Põe no palco um pedido da fila (entry_id) ou uma música direto (song_id)."""
     room = need_host(request)
+    need_access(room, True)
     if body.get("song_id"):
         _song_or_404(str(body["song_id"]))
     client = body.get("client") or client_id(request)

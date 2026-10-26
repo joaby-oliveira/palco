@@ -44,13 +44,21 @@ def song_dir(song_id: str):
     return config.SONGS_DIR / song_id
 
 
+def find_video(video_id: str, kind: str = "original") -> dict | None:
+    """A música desse vídeo que já está (ou vai ficar) pronta no repertório."""
+    for s in _songs.values():
+        # O mesmo vídeo pode estar no repertório para cantar e para dançar
+        same_mode = (s.get("kind") == "dance") == (kind == "dance")
+        if s["video_id"] == video_id and same_mode and s["status"] in ("queued", "processing", "ready"):
+            return s
+    return None
+
+
 def add(video: dict, artist: str, title: str, owner: str, kind: str = "original", want_backing: bool | None = None) -> dict:
     with _lock:
-        for s in _songs.values():
-            # O mesmo vídeo pode estar no repertório para cantar e para dançar
-            same_mode = (s.get("kind") == "dance") == (kind == "dance")
-            if s["video_id"] == video["id"] and same_mode and s["status"] in ("queued", "processing", "ready"):
-                return s
+        existing = find_video(video["id"], kind)
+        if existing:
+            return existing
         song = {
             "id": uuid.uuid4().hex[:10],
             "video_id": video["id"],

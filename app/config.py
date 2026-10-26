@@ -56,6 +56,23 @@ _lock = threading.Lock()
 _config: dict = {}
 
 
+def load_dotenv():
+    """Lê o .env da raiz (chaves de pagamento etc.) sem passar por cima do que já veio do ambiente.
+    No servidor o Docker já entrega as variáveis (--env-file) e o arquivo nem existe."""
+    env_file = ROOT / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_dotenv()
+
+
 def load() -> dict:
     global _config
     DATA_DIR.mkdir(exist_ok=True)

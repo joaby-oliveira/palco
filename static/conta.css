@@ -1,0 +1,35 @@
+/* Minha conta: entrar, passes, planos e pagamentos */
+.conta { display: flex; flex-direction: column; gap: 28px; max-width: 1100px; }
+.conta .top { justify-content: space-between; }
+#me:not([hidden]) { display: flex; flex-direction: column; gap: 36px; }
+.conta .auth { max-width: 440px; width: 100%; align-self: center; display: flex; flex-direction: column; gap: 18px; }
+.conta .auth .seg { align-self: center; }
+.conta .auth input { width: 100%; }
+.conta .auth .btn.big { width: 100%; }
+.conta .reg-only { display: none; }
+.conta .registering .reg-only { display: flex; }
+.plans-title { margin-bottom: 4px; }
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 18px; }
+.plan { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+.plan.featured { border-color: var(--gold); box-shadow: 0 10px 40px rgba(255,201,60,.15); }
+.plan .ribbon { position: absolute; top: -12px; left: 22px; background: var(--gold); color: var(--gold-ink); font-weight: 800; font-size: 12px; border-radius: 999px; padding: 3px 12px; }
+.plan .pname { font-family: var(--display); font-size: 22px; line-height: 1.1; }
+.plan .price { font-size: 30px; font-weight: 800; }
+.plan .price small { font-size: 14px; font-weight: 600; color: var(--muted); }
+.plan ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.plan .current { color: var(--green); font-weight: 700; font-size: 14px; }
+.access-box { display: flex; flex-direction: column; gap: 10px; }
+.access-box .big { font-family: var(--display); font-size: 26px; color: var(--gold); line-height: 1.1; }
+.access-box .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.access-box .meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; max-width: 420px; }
+.access-box .meter > div { height: 100%; background: var(--gold); }
+.profile { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 16px; align-items: end; }
+.profile input { width: 100%; }
+.orders { display: flex; flex-direction: column; gap: 8px; }
+.order { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.order:last-child { border-bottom: 0; }
+.order .st-paid { color: var(--green); }
+.order .st-pending { color: var(--gold); }
+.order .st-refunded { color: var(--muted); }
+.paying { display: flex; align-items: center; gap: 14px; }
+.broker-pick { max-width: 260px; margin-top: 16px; }

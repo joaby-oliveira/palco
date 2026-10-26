@@ -120,6 +120,10 @@ def find(rid: str, token: str = "") -> tuple["Room | None", bool]:
     return room, bool(token) and secrets.compare_digest(token.encode(), room.token.encode())
 
 
+def rooms_of(account: str) -> list["Room"]:
+    return [r for r in _rooms.values() if r.account == account]
+
+
 def drop_song(song_id: str):
     """Música apagada da biblioteca sai da fila de todas as salas."""
     with _lock:
@@ -141,13 +145,17 @@ class Room:
         self.touched: float = data.get("touched") or time.time()
         self.host_client: str = data.get("host_client", "")  # aparelho do telão (para chamar o anfitrião para um duelo)
         self.offline: list[str] = data.get("offline", [])  # convidados sem celular, adicionados pelo telão
+        self.account: str | None = data.get("account")    # conta que paga esta festa (com a cobrança ligada)
+        self.free: bool = data.get("free", False)          # festa do dono do servidor: não passa pela cobrança
+        self.joined: list[str] = data.get("joined", [])    # celulares que já entraram (limite de convidados)
         self.online: dict[str, int] = {}                 # convidado -> conexões abertas
         self.fx_event: dict = {"seq": 0}                 # último efeito; o telão toca quando o seq muda
 
     def dump(self) -> dict:
         return {"token": self.token, "host_name": self.host_name, "queue": self.queue,
                 "current": self.current, "last": self.last, "touched": self.touched,
-                "host_client": self.host_client, "offline": self.offline}
+                "host_client": self.host_client, "offline": self.offline, "account": self.account,
+                "free": self.free, "joined": self.joined}
 
     def _changed(self):
         self.touched = time.time()
@@ -181,6 +189,26 @@ class Room:
             self._changed()
         store.touch()
         return dict(g, client=client)
+
+    def set_owner(self, account: str | None = None, free: bool | None = None):
+        with _lock:
+            if account is not None:
+                self.account = account
+            if free is not None:
+                self.free = free
+            self._changed()
+        store.touch()
+
+    def admit(self, client: str, limit: int | None) -> bool:
+        """Celular entrando: cabe na festa? Quem já entrou uma vez sempre volta."""
+        with _lock:
+            if client in self.joined:
+                return True
+            if limit is not None and len(self.joined) >= limit:
+                return False
+            self.joined.append(client)
+            self._changed()
+        return True
 
     def connected(self, client: str, delta: int):
         with _lock:

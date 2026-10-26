@@ -256,6 +256,41 @@ docker run -d -v palco-data:/app/data -p 8000:8000 \
   YouTube liberou. Os cookies vencem de tempos em tempos; quando o download
   voltar a falhar, a mensagem de erro avisa para enviar de novo.
 
+### Cobrança: passe por festa e planos mensais
+
+Com `BILLING=1`, a festa de quem abre o site só funciona com um passe ou plano
+ativo. No notebook (localhost) e na festa do dono do servidor (`HOST_KEY`)
+continua tudo liberado. Sem `BILLING`, nada muda.
+
+- **Minha conta** (`/conta`): cadastro com e-mail e senha, compra e
+  pagamentos. O telão mostra um aviso no rodapé com o atalho quando a festa
+  não está liberada, e o selo do plano no topo quando está.
+- **Passe Festa 12h / 24h**: vira um crédito na conta. As horas só começam a
+  contar quando o anfitrião aperta **Começar a festa agora** (no telão ou em
+  Minha conta), então dá para comprar com antecedência.
+- **Planos mensais** (Festeiro, Animador, Casa / Bar): cobrança no cartão todo
+  mês. O limite é de **músicas novas** preparadas no mês (é o que gasta
+  separação de voz); músicas que já estão no repertório não contam. Também
+  limitam celulares por festa, modo dança e telões ao mesmo tempo. Cancelado,
+  vale até o fim do mês pago.
+- Preços e limites ficam em `app/plans.py`. Mudou o preço: o AbacatePay ganha
+  um produto novo na próxima compra (os antigos ficam lá, sem uso).
+- Contas em `data/accounts.json`; pedidos e eventos em `data/billing.json`.
+
+Formas de pagamento (no `.env` local ou no `/opt/palco/.env` do servidor;
+modelo em `.env.example`). A principal é a de `BILLING_PROVIDER`; as outras
+configuradas aparecem em **Pagar com**.
+
+| Broker | Variáveis | Webhook |
+|---|---|---|
+| AbacatePay (principal) | `ABACATEPAY_API_KEY`, `ABACATEPAY_WEBHOOK_SECRET` | `https://SEU-DOMINIO/api/billing/webhook/abacatepay` com o mesmo segredo, eventos `checkout.completed`, `checkout.refunded`, `subscription.completed`, `subscription.renewed`, `subscription.cancelled` |
+| Asaas | `ASAAS_API_KEY`, `ASAAS_WEBHOOK_TOKEN`, `ASAAS_SANDBOX=1` para testes | `https://SEU-DOMINIO/api/billing/webhook/asaas` com o token de autenticação. Pede CPF/CNPJ (em Minha conta) |
+| Mercado Pago | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` | `https://SEU-DOMINIO/api/billing/webhook/mercadopago`, eventos Pagamentos e Planos e assinaturas |
+
+Sem webhook (testando no notebook, por exemplo), a página de volta do
+pagamento pergunta ao broker até o pagamento cair. Chave `abc_dev_` do
+AbacatePay é o modo dev: o checkout tem **Simular pagamento**.
+
 ### Deploy automático e sem queda
 
 No servidor, o `palco-autodeploy.timer` (systemd) confere o `main` do GitHub a

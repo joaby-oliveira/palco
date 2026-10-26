@@ -97,16 +97,18 @@ async function api(path, opts = {}) {
 // Recebe o estado do servidor em tempo real e reconecta sozinho.
 // Efeitos sonoros chegam pelo mesmo canal, em mensagens separadas.
 function watchState(onState, onFx) {
-  const handle = (data) => { restartBanner(data); onState(data); };
+  const handle = (data) => { restartBanner(data); billingBanner(data); onState(data); };
+  let blocked = false;
   const connect = async () => {
     await ROOM_READY;
     const room = ROOM ? `&sala=${encodeURIComponent(ROOM.id)}${ROOM.token ? `&token=${encodeURIComponent(ROOM.token)}` : ""}` : "";
     const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?client=${CLIENT}${room}`);
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data);
+      if (data.blocked) { blocked = true; partyFull(data.blocked); return; }
       if (data.fx_event) { if (onFx) onFx(data.fx_event); } else handle(data);
     };
-    ws.onclose = () => setTimeout(connect, 1500);
+    ws.onclose = () => { if (!blocked) setTimeout(connect, 1500); };
   };
   api("/api/state").then(handle).catch(() => {});
   connect();
@@ -117,6 +119,42 @@ function restartBanner(state) {
   if (!state.needs_restart || document.getElementById("restart-banner")) return;
   document.body.append(h("div", { class: "restart-banner", id: "restart-banner", role: "alert" },
     h("b", {}, "O app foi atualizado."), " Feche a janela preta do servidor e abra o iniciar.bat de novo para as novidades funcionarem."));
+}
+
+// ---------- Cobrança: festa sem passe ou plano ----------
+// O telão (e o palco) mostra o que falta e o atalho; o celular só avisa que o anfitrião precisa liberar.
+
+function billingBanner(state) {
+  const b = state.billing || {};
+  let el = document.getElementById("billing-banner");
+  if (!b.enabled || b.ok) { if (el) el.remove(); return; }
+  const key = `${b.reason}|${state.is_host}`;
+  if (el && el.dataset.key === key) return;
+  const actions = [];
+  if (state.is_host) {
+    if (b.reason === "login") actions.push(h("a", { class: "btn sm", href: "/conta?voltar=telao" }, "Entrar na minha conta"));
+    else if (b.reason === "unused") actions.push(h("button", { class: "btn sm", onclick: startPassNow }, "Começar a festa agora"));
+    else actions.push(h("a", { class: "btn sm", href: "/conta" }, "Ver passes e planos"));
+  }
+  const fresh = h("div", { class: "billing-banner", id: "billing-banner", role: "alert", "data-key": key },
+    h("span", {}, b.message), ...actions);
+  if (el) el.replaceWith(fresh); else document.body.append(fresh);
+}
+
+async function startPassNow(e) {
+  e.currentTarget.disabled = true;
+  try {
+    await api("/api/billing/pass/start", { method: "POST" });
+    toast("Festa liberada! Bora cantar.");
+  } catch (err) { toast(err.message, true); e.currentTarget.disabled = false; }
+}
+
+// Celular que chegou com a festa já cheia (limite de convidados do plano)
+function partyFull(message) {
+  document.body.replaceChildren(h("div", { class: "onboard" },
+    h("img", { src: "/static/disco.svg", width: 110, height: 121, alt: "" }),
+    h("div", { class: "display", style: "font-size:34px;color:var(--gold);line-height:1" }, "FESTA CHEIA"),
+    h("p", { class: "sub", style: "text-align:center;max-width:320px" }, message)));
 }
 
 function h(tag, attrs = {}, ...children) {

@@ -70,6 +70,20 @@ function renderAlert() {
 }
 $("alert-chip").addEventListener("click", () => openSettings().catch((e) => toast(e.message, true)));
 
+// Com a cobrança ligada: qual passe ou plano está liberando a festa (e quanto sobra)
+function renderPlanChip() {
+  const chip = $("plan-chip");
+  const b = STATE.billing || {};
+  const a = b.access;
+  if (!b.enabled || b.free || !a || !a.active) { chip.hidden = true; return; }
+  const hour = new Date(a.until * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const left = a.songs_left;
+  chip.textContent = a.source === "pass" ? `${a.name}: até ${hour}` : (left === null ? a.name : `${a.name}: ${left} músicas novas`);
+  chip.classList.toggle("low", left !== null && left <= 10);
+  chip.title = "Minha conta: passes e planos";
+  chip.hidden = false;
+}
+
 function usageDetails() {
   const u = USAGE;
   if (!u || !u.supported) return null;
@@ -104,6 +118,7 @@ watchState((s) => {
   renderSoundBoard($("fx-sounds"), s.fx, { keys: true });
   Fx.setVolume(deviceGet("fx_volume"));
   renderAlert();
+  renderPlanChip();
   renderHero();
   renderStageQueue();
   renderPreparing();

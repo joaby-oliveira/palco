@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#110A1C">
+<title>Palco · Minha conta</title>
+<link rel="icon" href="/static/disco.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/static/style.css?v=7">
+<link rel="stylesheet" href="/static/conta.css?v=2">
+</head>
+<body>
+<div class="beams" aria-hidden="true"><span></span><span></span></div>
+
+<div class="wrap conta">
+  <header class="top">
+    <a class="brand" href="/" aria-label="Palco, voltar para o telão">
+      <img src="/static/disco.svg" width="44" height="48" alt="">
+      <span><span class="name">PALCO</span><span class="tag" style="display:block">minha conta</span></span>
+    </a>
+    <div class="top-actions">
+      <a class="btn ghost sm" href="/"><i data-icon="back" data-size="16"></i>Voltar para o telão</a>
+    </div>
+  </header>
+
+  <!-- Pagamento voltando do checkout -->
+  <div class="card paying" id="paying" hidden></div>
+
+  <!-- Sem conta: entrar ou criar -->
+  <section class="card auth" id="auth" hidden>
+    <div class="seg" role="group" aria-label="Entrar ou criar conta">
+      <button type="button" data-auth="login" class="on" aria-pressed="true">Entrar</button>
+      <button type="button" data-auth="register" aria-pressed="false">Criar conta</button>
+    </div>
+    <form id="auth-form">
+      <label class="field reg-only"><span>Nome</span><input type="text" name="name" autocomplete="name" maxlength="60"></label>
+      <label class="field"><span>E-mail</span><input type="text" name="email" inputmode="email" autocomplete="email" required></label>
+      <label class="field"><span>Senha</span><input type="password" name="password" autocomplete="current-password" minlength="8" required></label>
+      <label class="field reg-only"><span>WhatsApp (opcional)</span><input type="text" name="phone" inputmode="tel" autocomplete="tel" placeholder="(14) 99999-9999"></label>
+      <button class="btn big" type="submit" id="auth-submit">ENTRAR</button>
+      <p class="err-text" id="auth-error" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- Com conta -->
+  <div id="me" hidden>
+    <section class="card">
+      <div class="section-head" style="margin:0 0 12px">
+        <h2 class="h-section" id="hello">OLÁ</h2>
+        <button class="btn ghost sm" id="logout">Sair</button>
+      </div>
+      <div id="access"></div>
+    </section>
+
+    <section>
+      <h2 class="h-section plans-title">PASSE POR FESTA</h2>
+      <p class="sub">Compra quando quiser. As horas só começam a contar quando você aperta para começar a festa.</p>
+      <div class="plans" id="passes"></div>
+    </section>
+
+    <section>
+      <h2 class="h-section plans-title">PLANOS MENSAIS</h2>
+      <p class="sub">Para quem faz festa sempre, para bar e para quem anima eventos. Cancela quando quiser; vale até o fim do mês pago.</p>
+      <div class="plans" id="monthly"></div>
+      <label class="field broker-pick" id="broker-pick" hidden><span>Pagar com</span><select id="broker"></select></label>
+    </section>
+
+    <section class="card">
+      <h2 class="h-section" style="margin-bottom:12px">SEUS DADOS</h2>
+      <form id="profile" class="profile">
+        <label class="field"><span>Nome</span><input type="text" name="name" maxlength="60"></label>
+        <label class="field"><span>WhatsApp</span><input type="text" name="phone" inputmode="tel"></label>
+        <label class="field"><span>CPF ou CNPJ <small class="hint" id="tax-hint"></small></span><input type="text" name="tax_id" inputmode="numeric" placeholder="Só números"></label>
+        <div><button class="btn ghost" type="submit">Salvar dados</button></div>
+      </form>
+    </section>
+
+    <section class="card" id="orders-card" hidden>
+      <h2 class="h-section" style="margin-bottom:12px">PAGAMENTOS</h2>
+      <div class="orders" id="orders"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/common.js?v=7"></script>
+<script src="/static/conta.js?v=1"></script>
+</body>
+</html>
